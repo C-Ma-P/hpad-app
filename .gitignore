@@ -1,0 +1,14 @@
+# Go
+/bin/
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# VS Code
+.vscode/
+
+# Dependency directories
+pkg/
