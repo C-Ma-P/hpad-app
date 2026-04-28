@@ -1,0 +1,79 @@
+version: '3'
+
+vars:
+  APP_NAME: hpad-agent
+  BIN_DIR: bin
+  VITE_PORT: '{{.WAILS_VITE_PORT | default 9245}}'
+
+tasks:
+  go:mod:tidy:
+    internal: true
+    cmds:
+      - go mod tidy
+
+  bindings:generate:
+    deps:
+      - task: go:mod:tidy
+    cmds:
+      - wails3 generate bindings -clean=true -ts
+
+  frontend:install:
+    dir: frontend
+    preconditions:
+      - sh: npm version
+        msg: npm is required to build the frontend
+    cmds:
+      - npm install
+
+  frontend:build:
+    dir: frontend
+    deps:
+      - task: frontend:install
+      - task: bindings:generate
+    cmds:
+      - npm run build
+
+  frontend:dev:
+    dir: frontend
+    deps:
+      - task: frontend:install
+      - task: bindings:generate
+    cmds:
+      - npm run dev -- --port {{.VITE_PORT}} --strictPort
+
+  build:
+    cmds:
+      - task: linux:build
+
+  dev:build:
+    deps:
+      - task: go:mod:tidy
+    cmds:
+      - mkdir -p {{.BIN_DIR}}
+      - go build -buildvcs=false -gcflags=all="-l" -o {{.BIN_DIR}}/{{.APP_NAME}} .
+
+  run:
+    cmds:
+      - ./{{.BIN_DIR}}/{{.APP_NAME}}
+
+  linux:build:
+    deps:
+      - task: go:mod:tidy
+      - task: frontend:build
+    cmds:
+      - mkdir -p {{.BIN_DIR}}
+      - go build -tags production -trimpath -buildvcs=false -ldflags="-w -s" -o {{.BIN_DIR}}/{{.APP_NAME}} .
+
+  linux:run:
+    cmds:
+      - ./{{.BIN_DIR}}/{{.APP_NAME}}
+
+  linux:install-udev-rule:
+    cmds:
+      - sudo install -m 0644 build/99-hpad.rules /etc/udev/rules.d/99-hpad.rules
+      - sudo udevadm control --reload-rules
+      - sudo udevadm trigger --action=add --subsystem-match=hidraw
+
+  dev:
+    cmds:
+      - wails3 dev -config ./build/config.yml

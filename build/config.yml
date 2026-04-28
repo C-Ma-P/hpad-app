@@ -1,0 +1,40 @@
+version: '3'
+
+info:
+  companyName: C-Ma-P
+  productName: HPAD
+  productIdentifier: io.github.cmap.hpadagent
+  description: HPAD desktop configurator
+  copyright: (c) 2026, C-Ma-P
+  comments: HPAD desktop configurator
+  version: 0.1.0
+
+dev_mode:
+  root_path: .
+  log_level: warn
+  debounce: 500
+  ignore:
+    dir:
+      - .git
+      - bin
+      - frontend
+      - frontend/dist
+      - frontend/node_modules
+    file:
+      - .DS_Store
+      - .gitignore
+    watched_extension:
+      - "*.go"
+      - "*.json"
+      - "*.yml"
+      - "*.yaml"
+    git_ignore: true
+  executes:
+    - cmd: wails3 task frontend:install
+      type: once
+    - cmd: wails3 task frontend:dev
+      type: background
+    - cmd: wails3 task dev:build
+      type: blocking
+    - cmd: wails3 task run
+      type: primary

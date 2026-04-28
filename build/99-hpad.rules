@@ -1,0 +1,1 @@
+KERNEL=="hidraw*", SUBSYSTEM=="hidraw", ATTRS{idVendor}=="cafe", ATTRS{idProduct}=="b00b", MODE="0666"
