@@ -35,6 +35,8 @@ export class KeyAction {
 export class KeyAssignment {
     "id": string;
     "label": string;
+    "color": string;
+    "brightness"?: number | null;
     "action": KeyAction;
 
     /** Creates a new KeyAssignment instance. */
@@ -44,6 +46,9 @@ export class KeyAssignment {
         }
         if (!("label" in $$source)) {
             this["label"] = "";
+        }
+        if (!("color" in $$source)) {
+            this["color"] = "";
         }
         if (!("action" in $$source)) {
             this["action"] = (new KeyAction());
@@ -56,10 +61,10 @@ export class KeyAssignment {
      * Creates a new KeyAssignment instance from a string or object.
      */
     static createFrom($$source: any = {}): KeyAssignment {
-        const $$createField2_0 = $$createType0;
+        const $$createField4_0 = $$createType0;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("action" in $$parsedSource) {
-            $$parsedSource["action"] = $$createField2_0($$parsedSource["action"]);
+            $$parsedSource["action"] = $$createField4_0($$parsedSource["action"]);
         }
         return new KeyAssignment($$parsedSource as Partial<KeyAssignment>);
     }

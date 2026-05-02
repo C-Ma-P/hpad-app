@@ -15,7 +15,7 @@ tasks:
     deps:
       - task: go:mod:tidy
     cmds:
-      - wails3 generate bindings -clean=true -ts
+      - wails3 generate bindings -clean=true -ts .
 
   frontend:install:
     dir: frontend

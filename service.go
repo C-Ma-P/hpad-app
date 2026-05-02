@@ -39,10 +39,18 @@ func (s *AgentService) ApplyKeyAction(index int, action config.KeyAction) (backe
 	return s.core.ApplyKeyAction(index, action)
 }
 
+func (s *AgentService) ApplyKeySettings(index int, action config.KeyAction, color string, brightness uint8) (backend.DashboardState, error) {
+	return s.core.ApplyKeySettings(index, action, color, brightness)
+}
+
 func (s *AgentService) ClearKeyAction(index int) (backend.DashboardState, error) {
 	return s.core.ClearKeyAction(index)
 }
 
 func (s *AgentService) SaveToDevice() (backend.DashboardState, error) {
 	return s.core.SaveToDevice()
+}
+
+func (s *AgentService) observeRuntimeStatus(observer func(backend.RuntimeStatus)) {
+	s.core.SetRuntimeStatusObserver(observer)
 }

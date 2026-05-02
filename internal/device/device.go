@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/sstallion/go-hid"
@@ -21,7 +22,17 @@ const (
 	vendorUsagePage   = 0xFF00
 	vendorUsage       = 0xFF01
 	consumerUsagePage = 0x000C
+	keyColorCount     = 6
+	vendorConfigCmd   = 0x01
+	vendorReportSize  = 2 + (keyColorCount * 4)
 )
+
+type KeyLEDSetting struct {
+	Color      [3]byte
+	Brightness uint8
+}
+
+type KeyLEDSettings [keyColorCount]KeyLEDSetting
 
 type Info struct {
 	Path            string `json:"path"`
@@ -41,24 +52,32 @@ type Report struct {
 	Charging       bool   `json:"charging"`
 }
 
+type DisconnectInfo struct {
+	Reason  string `json:"reason"`
+	IsError bool   `json:"isError"`
+}
+
 type Callbacks struct {
 	Connected    func(Info)
-	Disconnected func(string)
+	Disconnected func(DisconnectInfo)
 	Report       func(Report)
 	Log          func(string, string)
 }
 
 type Manager struct {
-	mu                   sync.Mutex
-	callbacks            Callbacks
-	running              bool
-	cancel               context.CancelFunc
-	done                 chan struct{}
-	initOnce             sync.Once
-	initErr              error
-	lastScan             string
-	lastOpen             string
-	lastDisconnectReason string
+	mu                     sync.Mutex
+	writeMu                sync.Mutex
+	callbacks              Callbacks
+	running                bool
+	cancel                 context.CancelFunc
+	done                   chan struct{}
+	device                 *hid.Device
+	initOnce               sync.Once
+	initErr                error
+	lastScan               string
+	lastOpen               string
+	lastDisconnectReason   string
+	lastDisconnectWasError bool
 }
 
 // lastScanSentinel is an initial value for Manager.lastScan that can never
@@ -70,7 +89,7 @@ func NewManager(callbacks Callbacks) *Manager {
 		callbacks.Connected = func(Info) {}
 	}
 	if callbacks.Disconnected == nil {
-		callbacks.Disconnected = func(string) {}
+		callbacks.Disconnected = func(DisconnectInfo) {}
 	}
 	if callbacks.Report == nil {
 		callbacks.Report = func(Report) {}
@@ -123,7 +142,7 @@ func (m *Manager) loop(ctx context.Context) {
 
 	if err := m.init(); err != nil {
 		log.Printf("[device] hid.Init failed: %v", err)
-		m.callbacks.Disconnected(err.Error())
+		m.callbacks.Disconnected(DisconnectInfo{Reason: err.Error(), IsError: true})
 		return
 	}
 	m.callbacks.Log("info", "HID manager initialized")
@@ -139,7 +158,7 @@ func (m *Manager) loop(ctx context.Context) {
 		candidates, err := enumerate()
 		if err != nil {
 			m.callbacks.Log("error", fmt.Sprintf("HID enumerate failed: %v", err))
-			m.notifyDisconnected(err.Error())
+			m.notifyDisconnected(DisconnectInfo{Reason: err.Error(), IsError: true})
 			if !waitRetry(ctx) {
 				return
 			}
@@ -153,7 +172,7 @@ func (m *Manager) loop(ctx context.Context) {
 			if sysfsMatch {
 				reason = "device visible in sysfs but not enumerable by hidapi (permission denied on hidraw – run: task linux:install-udev-rule, then replug)"
 			}
-			m.notifyDisconnected(reason)
+			m.notifyDisconnected(DisconnectInfo{Reason: reason})
 			if !waitRetry(ctx) {
 				return
 			}
@@ -166,7 +185,7 @@ func (m *Manager) loop(ctx context.Context) {
 				m.callbacks.Log("error", fmt.Sprintf("Failed to open HPad HID interface(s): %s", err.Error()))
 				m.lastOpen = err.Error()
 			}
-			m.notifyDisconnected(err.Error())
+			m.notifyDisconnected(DisconnectInfo{Reason: err.Error(), IsError: true})
 			if !waitRetry(ctx) {
 				return
 			}
@@ -174,10 +193,12 @@ func (m *Manager) loop(ctx context.Context) {
 		}
 		m.lastOpen = ""
 		m.lastDisconnectReason = ""
+		m.setDevice(dev)
 
 		m.callbacks.Log("info", fmt.Sprintf("Opened HPad HID interface %s (usage 0x%04X/0x%04X, iface %d)", info.Path, info.UsagePage, info.Usage, info.InterfaceNumber))
 		m.callbacks.Connected(info)
 		readErr := m.readLoop(ctx, dev)
+		m.setDevice(nil)
 		_ = dev.Close()
 
 		if ctx.Err() != nil {
@@ -187,7 +208,7 @@ func (m *Manager) loop(ctx context.Context) {
 			readErr = errors.New("device disconnected")
 		}
 		m.callbacks.Log("warn", fmt.Sprintf("HPad HID interface closed: %s", readErr.Error()))
-		m.notifyDisconnected(readErr.Error())
+		m.notifyDisconnected(DisconnectInfo{Reason: readErr.Error()})
 		if !waitRetry(ctx) {
 			return
 		}
@@ -207,12 +228,13 @@ func (m *Manager) logScan(candidates []Info) {
 	m.callbacks.Log("debug", fmt.Sprintf("Discovered %d HPad HID interface(s): %s", len(candidates), summary))
 }
 
-func (m *Manager) notifyDisconnected(reason string) {
-	if reason == m.lastDisconnectReason {
+func (m *Manager) notifyDisconnected(info DisconnectInfo) {
+	if info.Reason == m.lastDisconnectReason && info.IsError == m.lastDisconnectWasError {
 		return
 	}
-	m.lastDisconnectReason = reason
-	m.callbacks.Disconnected(reason)
+	m.lastDisconnectReason = info.Reason
+	m.lastDisconnectWasError = info.IsError
+	m.callbacks.Disconnected(info)
 }
 
 func (m *Manager) init() error {
@@ -220,6 +242,36 @@ func (m *Manager) init() error {
 		m.initErr = hid.Init()
 	})
 	return m.initErr
+}
+
+func (m *Manager) SyncKeyLEDSettings(settings KeyLEDSettings) error {
+	report := encodeKeyLEDReport(settings)
+
+	m.mu.Lock()
+	dev := m.device
+	m.mu.Unlock()
+	if dev == nil {
+		return errors.New("dongle not connected")
+	}
+
+	m.writeMu.Lock()
+	defer m.writeMu.Unlock()
+
+	n, err := dev.SendOutputReport(report[:])
+	if err != nil {
+		return err
+	}
+	if n != len(report) {
+		return fmt.Errorf("short HID output report write: %d/%d", n, len(report))
+	}
+
+	return nil
+}
+
+func (m *Manager) setDevice(dev *hid.Device) {
+	m.mu.Lock()
+	m.device = dev
+	m.mu.Unlock()
 }
 
 func (m *Manager) readLoop(ctx context.Context, dev *hid.Device) error {
@@ -236,6 +288,9 @@ func (m *Manager) readLoop(ctx context.Context, dev *hid.Device) error {
 			continue
 		}
 		if err != nil {
+			if isTransientReadError(err) {
+				continue
+			}
 			return err
 		}
 		if n == 0 {
@@ -248,6 +303,19 @@ func (m *Manager) readLoop(ctx context.Context, dev *hid.Device) error {
 		}
 		m.callbacks.Report(report)
 	}
+}
+
+func isTransientReadError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	message := strings.ToLower(err.Error())
+	if strings.Contains(message, syscall.EINTR.Error()) || strings.Contains(message, "eintr") {
+		return true
+	}
+
+	return false
 }
 
 func enumerate() ([]Info, error) {
@@ -349,6 +417,22 @@ func summarizeCandidates(candidates []Info) string {
 		parts = append(parts, fmt.Sprintf("%s (usage 0x%04X/0x%04X, iface %d)", candidate.Path, candidate.UsagePage, candidate.Usage, candidate.InterfaceNumber))
 	}
 	return strings.Join(parts, ", ")
+}
+
+func encodeKeyLEDReport(settings KeyLEDSettings) [vendorReportSize]byte {
+	var report [vendorReportSize]byte
+	offset := 2
+
+	report[0] = 0
+	report[1] = vendorConfigCmd
+	for _, setting := range settings {
+		copy(report[offset:offset+len(setting.Color)], setting.Color[:])
+		offset += len(setting.Color)
+		report[offset] = setting.Brightness
+		offset++
+	}
+
+	return report
 }
 
 func decodePayload(raw []byte) (Report, bool) {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -20,6 +21,8 @@ const (
 )
 
 const defaultProfileName = "Default"
+const defaultKeyColor = "#000000"
+const defaultKeyBrightness = uint8(0xFF)
 
 type KeyAction struct {
 	Type             string `json:"type"`
@@ -34,6 +37,8 @@ type KeyAction struct {
 type KeyAssignment struct {
 	ID     string    `json:"id"`
 	Label  string    `json:"label"`
+	Color  string    `json:"color"`
+	Brightness *uint8 `json:"brightness,omitempty"`
 	Action KeyAction `json:"action"`
 }
 
@@ -154,9 +159,19 @@ func Validate(cfg Config) error {
 		return fmt.Errorf("config must contain %d keys", keyCount)
 	}
 	for index, key := range cfg.KeyAssignments {
+		if err := ValidateColor(key.Color); err != nil {
+			return fmt.Errorf("key %d: %w", index+1, err)
+		}
 		if err := ValidateAction(key.Action); err != nil {
 			return fmt.Errorf("key %d: %w", index+1, err)
 		}
+	}
+	return nil
+}
+
+func ValidateColor(color string) error {
+	if _, err := normalizeColor(color); err != nil {
+		return err
 	}
 	return nil
 }
@@ -201,6 +216,13 @@ func Clone(cfg Config) Config {
 
 func DefaultAssignment(index int) KeyAssignment {
 	return defaultAssignment(index)
+}
+
+func NormalizeBrightness(brightness *uint8) uint8 {
+	if brightness == nil {
+		return defaultKeyBrightness
+	}
+	return *brightness
 }
 
 func ClearAction() KeyAction {
@@ -251,6 +273,8 @@ func defaultAssignment(index int) KeyAssignment {
 	return KeyAssignment{
 		ID:     name,
 		Label:  name,
+		Color:  defaultKeyColor,
+		Brightness: brightnessPtr(defaultKeyBrightness),
 		Action: ClearAction(),
 	}
 }
@@ -265,6 +289,8 @@ func normalizeAssignment(index int, assignment KeyAssignment) KeyAssignment {
 	if assignment.Label == "" {
 		assignment.Label = defaultKey.Label
 	}
+	assignment.Color = NormalizeColor(assignment.Color)
+	assignment.Brightness = brightnessPtr(NormalizeBrightness(assignment.Brightness))
 	assignment.Action = NormalizeAction(assignment.Action)
 	return assignment
 }
@@ -284,10 +310,42 @@ func normalizeLegacyAssignments(keys []legacyKey) []KeyAssignment {
 		assignments = append(assignments, KeyAssignment{
 			ID:     fmt.Sprintf("K%d", index+1),
 			Label:  strings.TrimSpace(key.Label),
+			Color:  defaultKeyColor,
+			Brightness: brightnessPtr(defaultKeyBrightness),
 			Action: NormalizeAction(action),
 		})
 	}
 	return assignments
+}
+
+func brightnessPtr(brightness uint8) *uint8 {
+	value := brightness
+	return &value
+}
+
+func NormalizeColor(color string) string {
+	normalized, err := normalizeColor(color)
+	if err != nil {
+		return defaultKeyColor
+	}
+	return normalized
+}
+
+func normalizeColor(color string) (string, error) {
+	color = strings.TrimSpace(strings.ToUpper(color))
+	if color == "" {
+		return defaultKeyColor, nil
+	}
+	if !strings.HasPrefix(color, "#") {
+		color = "#" + color
+	}
+	if len(color) != 7 {
+		return "", fmt.Errorf("color must be a 6-digit hex value")
+	}
+	if _, err := strconv.ParseUint(color[1:], 16, 24); err != nil {
+		return "", fmt.Errorf("color must be a 6-digit hex value")
+	}
+	return color, nil
 }
 
 func normalizeActionType(value string) string {

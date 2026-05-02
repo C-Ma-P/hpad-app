@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log"
 	"reflect"
+	"strconv"
+	"strings"
 	"sync"
 
 	"hpad-app/internal/actions"
@@ -38,17 +40,28 @@ type DashboardState struct {
 	Saved          bool                   `json:"saved"`
 }
 
+type RuntimeStatus struct {
+	Dashboard    DashboardState `json:"dashboard"`
+	ErrorMessage string         `json:"errorMessage,omitempty"`
+}
+
+type keyLEDSyncer interface {
+	SyncKeyLEDSettings(device.KeyLEDSettings) error
+}
+
 type Core struct {
-	mu        sync.RWMutex
-	store     *config.Store
-	device    *device.Manager
-	runner    *actions.Runner
-	cancel    context.CancelFunc
-	config    config.Config
-	persisted config.Config
-	state     DashboardState
-	prevKeys  uint8
-	started   bool
+	mu             sync.RWMutex
+	store          *config.Store
+	device         *device.Manager
+	runner         *actions.Runner
+	cancel         context.CancelFunc
+	config         config.Config
+	persisted      config.Config
+	state          DashboardState
+	prevKeys       uint8
+	started        bool
+	runtimeError   string
+	statusObserver func(RuntimeStatus)
 }
 
 func NewCore() (*Core, error) {
@@ -124,9 +137,11 @@ func (c *Core) Stop() error {
 	c.device = nil
 	c.cancel = nil
 	c.prevKeys = 0
+	c.runtimeError = ""
 	c.state = newDashboardState(c.config)
 	c.state.Dirty = !reflect.DeepEqual(c.config, c.persisted)
 	c.state.Saved = !c.state.Dirty
+	observer, status := c.runtimeStatusLocked()
 	c.mu.Unlock()
 
 	if cancel != nil {
@@ -135,7 +150,16 @@ func (c *Core) Stop() error {
 	if deviceManager != nil {
 		deviceManager.Stop()
 	}
+	notifyRuntimeStatus(observer, status)
 	return nil
+}
+
+func (c *Core) SetRuntimeStatusObserver(observer func(RuntimeStatus)) {
+	c.mu.Lock()
+	c.statusObserver = observer
+	_, status := c.runtimeStatusLocked()
+	c.mu.Unlock()
+	notifyRuntimeStatus(observer, status)
 }
 
 func (c *Core) GetDashboardState() DashboardState {
@@ -161,6 +185,29 @@ func (c *Core) ApplyKeyAction(index int, action config.KeyAction) (DashboardStat
 	return c.snapshotLocked(), nil
 }
 
+func (c *Core) ApplyKeySettings(index int, action config.KeyAction, color string, brightness uint8) (DashboardState, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if index < 0 || index >= len(c.config.KeyAssignments) {
+		return DashboardState{}, newIndexError(index)
+	}
+	action = config.NormalizeAction(action)
+	if err := config.ValidateAction(action); err != nil {
+		return DashboardState{}, err
+	}
+	color = config.NormalizeColor(color)
+	if err := config.ValidateColor(color); err != nil {
+		return DashboardState{}, err
+	}
+	assignment := c.config.KeyAssignments[index]
+	assignment.Action = action
+	assignment.Color = color
+	assignment.Brightness = &brightness
+	c.config.KeyAssignments[index] = assignment
+	c.updateConfigStateLocked()
+	return c.snapshotLocked(), nil
+}
+
 func (c *Core) ClearKeyAction(index int) (DashboardState, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -180,6 +227,9 @@ func (c *Core) SaveToDevice() (DashboardState, error) {
 	if err := c.store.Save(c.config); err != nil {
 		return DashboardState{}, err
 	}
+	if err := syncKeyLEDConfig(c.device, c.config); err != nil {
+		return DashboardState{}, err
+	}
 	c.persisted = config.Clone(c.config)
 	c.updateConfigStateLocked()
 	return c.snapshotLocked(), nil
@@ -188,24 +238,40 @@ func (c *Core) SaveToDevice() (DashboardState, error) {
 func (c *Core) handleConnected(info device.Info) {
 	log.Printf("[core] dongle connected: %s", info.Path)
 	c.mu.Lock()
+	cfg := config.Clone(c.config)
+	manager := c.device
 	c.state.DongleStatus = DeviceConnectionStatus{
 		State:  "connected",
 		Label:  "Connected",
 		Detail: "USB HID interface available",
 		Path:   info.Path,
 	}
+	c.runtimeError = ""
 	c.state.MacropadStatus = disconnectedMacropadStatus()
+	observer, status := c.runtimeStatusLocked()
 	c.mu.Unlock()
+	notifyRuntimeStatus(observer, status)
+
+	if err := syncKeyLEDConfig(manager, cfg); err != nil {
+		log.Printf("[core] failed to sync LED config: %v", err)
+	}
 }
 
-func (c *Core) handleDisconnected(reason string) {
-	log.Printf("[core] dongle disconnected: %s", reason)
+func (c *Core) handleDisconnected(info device.DisconnectInfo) {
+	log.Printf("[core] dongle disconnected: %s", info.Reason)
 	c.mu.Lock()
-	c.state.DongleStatus = disconnectedDongleStatus(reason)
+	c.state.DongleStatus = disconnectedDongleStatus(info.Reason)
 	c.state.MacropadStatus = unknownMacropadStatus()
 	c.state.BatteryStatus = waitingBatteryStatus()
 	c.prevKeys = 0
+	if info.IsError {
+		c.runtimeError = info.Reason
+	} else {
+		c.runtimeError = ""
+	}
+	observer, status := c.runtimeStatusLocked()
 	c.mu.Unlock()
+	notifyRuntimeStatus(observer, status)
 }
 
 func (c *Core) handleDeviceLog(level, message string) {
@@ -218,10 +284,13 @@ func (c *Core) handleDeviceLog(level, message string) {
 func (c *Core) handleReport(report device.Report) {
 	c.mu.Lock()
 	if !report.Connected {
+		c.runtimeError = ""
 		c.state.BatteryStatus = waitingBatteryStatus()
 		c.prevKeys = 0
 		c.state.MacropadStatus = disconnectedMacropadStatus()
+		observer, status := c.runtimeStatusLocked()
 		c.mu.Unlock()
+		notifyRuntimeStatus(observer, status)
 		return
 	}
 
@@ -229,11 +298,14 @@ func (c *Core) handleReport(report device.Report) {
 	previous := c.prevKeys
 	rising := report.Keys &^ previous
 	c.prevKeys = report.Keys
+	c.runtimeError = ""
 	c.state.MacropadStatus = connectedMacropadStatus()
 	c.state.BatteryStatus = batteryStatusFromReport(report)
 	assignments := config.Clone(c.config).KeyAssignments
 	runner := c.runner
+	observer, status := c.runtimeStatusLocked()
 	c.mu.Unlock()
+	notifyRuntimeStatus(observer, status)
 
 	if runner == nil {
 		return
@@ -267,6 +339,19 @@ func (c *Core) snapshotLocked() DashboardState {
 	return state
 }
 
+func (c *Core) runtimeStatusLocked() (func(RuntimeStatus), RuntimeStatus) {
+	return c.statusObserver, RuntimeStatus{
+		Dashboard:    c.snapshotLocked(),
+		ErrorMessage: c.runtimeError,
+	}
+}
+
+func notifyRuntimeStatus(observer func(RuntimeStatus), status RuntimeStatus) {
+	if observer != nil {
+		observer(status)
+	}
+}
+
 func newDashboardState(cfg config.Config) DashboardState {
 	cfg = config.Normalize(cfg)
 	return DashboardState{
@@ -290,6 +375,58 @@ func disconnectedDongleStatus(reason string) DeviceConnectionStatus {
 		Label:  "Not Detected",
 		Detail: detail,
 	}
+}
+
+func syncKeyLEDConfig(syncer keyLEDSyncer, cfg config.Config) error {
+	if syncer == nil {
+		return errors.New("dongle not connected")
+	}
+
+	settings, err := keyLEDSettingsFromConfig(cfg)
+	if err != nil {
+		return err
+	}
+
+	return syncer.SyncKeyLEDSettings(settings)
+}
+
+func keyLEDSettingsFromConfig(cfg config.Config) (device.KeyLEDSettings, error) {
+	cfg = config.Normalize(cfg)
+	var settings device.KeyLEDSettings
+
+	for index, assignment := range cfg.KeyAssignments {
+		color, err := parseColorBytes(assignment.Color)
+		if err != nil {
+			return device.KeyLEDSettings{}, fmt.Errorf("key %d: %w", index+1, err)
+		}
+
+		settings[index] = device.KeyLEDSetting{
+			Color:      color,
+			Brightness: config.NormalizeBrightness(assignment.Brightness),
+		}
+	}
+
+	return settings, nil
+}
+
+func parseColorBytes(color string) ([3]byte, error) {
+	var rgb [3]byte
+
+	color = strings.TrimSpace(color)
+	color = strings.TrimPrefix(color, "#")
+	if len(color) != 6 {
+		return rgb, fmt.Errorf("invalid color %q", color)
+	}
+
+	for index := range rgb {
+		value, err := strconv.ParseUint(color[index*2:index*2+2], 16, 8)
+		if err != nil {
+			return rgb, fmt.Errorf("invalid color %q", color)
+		}
+		rgb[index] = byte(value)
+	}
+
+	return rgb, nil
 }
 
 func unknownMacropadStatus() DeviceConnectionStatus {

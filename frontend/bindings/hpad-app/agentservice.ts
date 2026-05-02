@@ -18,6 +18,12 @@ export function ApplyKeyAction(index: number, action: config$0.KeyAction): $Canc
     });
 }
 
+export function ApplyKeySettings(index: number, action: config$0.KeyAction, color: string, brightness: number): $CancellablePromise<app$0.DashboardState> {
+    return $Call.ByID(3857731378, index, action, color, brightness).then(($result: any) => {
+        return $$createType0($result);
+    });
+}
+
 export function ClearKeyAction(index: number): $CancellablePromise<app$0.DashboardState> {
     return $Call.ByID(17620114, index).then(($result: any) => {
         return $$createType0($result);

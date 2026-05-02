@@ -2,6 +2,11 @@ package config
 
 import "testing"
 
+func testBrightnessPtr(value uint8) *uint8 {
+	brightness := value
+	return &brightness
+}
+
 func TestNormalizePadsAssignments(t *testing.T) {
 	cfg := Normalize(Config{KeyAssignments: []KeyAssignment{{Label: "One"}}})
 	if len(cfg.KeyAssignments) != 6 {
@@ -12,6 +17,12 @@ func TestNormalizePadsAssignments(t *testing.T) {
 	}
 	if cfg.KeyAssignments[5].Label != "K6" {
 		t.Fatalf("expected missing keys to get defaults")
+	}
+	if cfg.KeyAssignments[0].Color != "#000000" {
+		t.Fatalf("expected missing color to default to #000000, got %q", cfg.KeyAssignments[0].Color)
+	}
+	if got := NormalizeBrightness(cfg.KeyAssignments[0].Brightness); got != 0xFF {
+		t.Fatalf("expected missing brightness to default to 255, got %d", got)
 	}
 }
 
@@ -38,8 +49,18 @@ func TestNormalizeMigratesLegacyKeys(t *testing.T) {
 	if cfg.KeyAssignments[5].ID != "K6" {
 		t.Fatalf("expected default key ids to be applied")
 	}
+	if got := NormalizeBrightness(cfg.KeyAssignments[0].Brightness); got != 0xFF {
+		t.Fatalf("expected migrated key brightness to default to 255, got %d", got)
+	}
 	if len(cfg.LegacyKeys) != 0 {
 		t.Fatalf("expected legacy keys to be removed from normalized config")
+	}
+}
+
+func TestNormalizePreservesExplicitBrightness(t *testing.T) {
+	cfg := Normalize(Config{KeyAssignments: []KeyAssignment{{Brightness: testBrightnessPtr(0)}}})
+	if got := NormalizeBrightness(cfg.KeyAssignments[0].Brightness); got != 0 {
+		t.Fatalf("expected explicit zero brightness to be preserved, got %d", got)
 	}
 }
 
@@ -48,5 +69,20 @@ func TestValidateRequiresCommandForRunCommand(t *testing.T) {
 	cfg.KeyAssignments[0].Action = KeyAction{Type: ActionTypeRunCommand}
 	if err := Validate(cfg); err == nil {
 		t.Fatal("expected validation error for run_command without command")
+	}
+}
+
+func TestNormalizeColorFormatsHexValues(t *testing.T) {
+	assignment := Normalize(Config{KeyAssignments: []KeyAssignment{{Color: "ff00aa"}}}).KeyAssignments[0]
+	if assignment.Color != "#FF00AA" {
+		t.Fatalf("expected uppercase hex color, got %q", assignment.Color)
+	}
+}
+
+func TestValidateRejectsInvalidColor(t *testing.T) {
+	cfg := Default()
+	cfg.KeyAssignments[0].Color = "#12"
+	if err := Validate(cfg); err == nil {
+		t.Fatal("expected validation error for invalid color")
 	}
 }

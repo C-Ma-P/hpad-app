@@ -1,8 +1,10 @@
 package device
 
 import (
+	"errors"
 	"os"
 	"strings"
+	"syscall"
 	"testing"
 )
 
@@ -109,6 +111,61 @@ func TestFormatOpenErrorIncludesPermissionHint(t *testing.T) {
 	} {
 		if !strings.Contains(message, want) {
 			t.Fatalf("expected %q in %q", want, message)
+		}
+	}
+}
+
+func TestIsTransientReadError(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{name: "nil", err: nil, want: false},
+		{name: "eintr string", err: errors.New("Interrupted system call"), want: true},
+		{name: "eintr token", err: errors.New("poll failed: EINTR"), want: true},
+		{name: "syscall eintr", err: syscall.EINTR, want: true},
+		{name: "disconnect", err: errors.New("device disconnected"), want: false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := isTransientReadError(test.err)
+			if got != test.want {
+				t.Fatalf("isTransientReadError(%v) = %v, want %v", test.err, got, test.want)
+			}
+		})
+	}
+}
+
+func TestEncodeKeyLEDReport(t *testing.T) {
+	settings := KeyLEDSettings{
+		{Color: [3]byte{0x11, 0x22, 0x33}, Brightness: 0x40},
+		{Color: [3]byte{0x44, 0x55, 0x66}, Brightness: 0x50},
+		{Color: [3]byte{0x77, 0x88, 0x99}, Brightness: 0x60},
+		{Color: [3]byte{0xAA, 0xBB, 0xCC}, Brightness: 0x70},
+		{Color: [3]byte{0xDD, 0xEE, 0xFF}, Brightness: 0x80},
+		{Color: [3]byte{0x10, 0x20, 0x30}, Brightness: 0x90},
+	}
+
+	report := encodeKeyLEDReport(settings)
+	if report[0] != 0 {
+		t.Fatalf("unexpected report id byte: %d", report[0])
+	}
+	if report[1] != vendorConfigCmd {
+		t.Fatalf("unexpected command byte: %d", report[1])
+	}
+	want := []byte{
+		0x11, 0x22, 0x33, 0x40,
+		0x44, 0x55, 0x66, 0x50,
+		0x77, 0x88, 0x99, 0x60,
+		0xAA, 0xBB, 0xCC, 0x70,
+		0xDD, 0xEE, 0xFF, 0x80,
+		0x10, 0x20, 0x30, 0x90,
+	}
+	for index, value := range want {
+		if report[index+2] != value {
+			t.Fatalf("unexpected payload byte %d: got 0x%02X want 0x%02X", index, report[index+2], value)
 		}
 	}
 }
