@@ -83,7 +83,6 @@ select {
 .toolbar-label,
 .status-chip-title,
 .section-kicker,
-.key-state,
 .selection-badge,
 .footer-state,
 .inspector-section-title,
@@ -118,7 +117,6 @@ select {
 .toolbar-label,
 .status-chip-title,
 .section-kicker,
-.key-state,
 .field span,
 .inspector-section-title {
   color: var(--text-muted);
@@ -197,6 +195,7 @@ select {
   display: flex;
   align-items: center;
   gap: 0;
+  flex-wrap: wrap;
   color: var(--text-muted);
 }
 
@@ -215,20 +214,20 @@ select {
 .layout-canvas {
   margin-top: 8px;
   display: flex;
+  width: 100%;
   align-items: flex-start;
-  justify-content: center;
+  justify-content: flex-start;
 }
 
 .device-shell {
   display: inline-flex;
-  padding: 14px;
+  max-width: 100%;
+  padding: 6px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 6px;
   background:
-    linear-gradient(180deg, rgba(23, 29, 37, 0.96) 0%, rgba(12, 16, 21, 0.98) 100%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.03),
-    0 12px 20px rgba(0, 0, 0, 0.12);
+    linear-gradient(180deg, rgba(20, 25, 32, 0.96) 0%, rgba(11, 15, 20, 0.98) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
 .status-card {
@@ -253,32 +252,38 @@ select {
 
 .key-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(112px, 124px));
-  gap: 6px;
-  justify-content: center;
+  grid-template-columns: repeat(3, minmax(110px, 118px));
+  gap: 8px;
+  justify-content: flex-start;
 }
 
 .key-card {
   --key-led-color: #000000;
   position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
   width: 100%;
-  min-height: 104px;
-  padding: 10px 10px 12px 14px;
+  min-height: 84px;
+  padding: 12px 10px 10px;
   border: 1px solid var(--border-strong);
   border-radius: 5px;
-  background: linear-gradient(180deg, #11161d 0%, #0c1015 100%);
+  background: linear-gradient(180deg, #10151c 0%, #0c1015 100%);
   color: inherit;
   text-align: left;
   cursor: pointer;
   transition: border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
+  overflow: hidden;
 }
 
 .key-card::before {
   content: "";
   position: absolute;
-  inset: 0 auto 0 0;
-  width: 3px;
-  border-radius: 5px 0 0 5px;
+  inset: 0 0 auto 0;
+  height: 4px;
+  border-radius: 5px 5px 0 0;
   background: var(--key-led-color);
   opacity: calc(0.18 + (0.72 * var(--key-led-opacity, 1)));
 }
@@ -294,8 +299,13 @@ select {
   box-shadow: inset 0 0 0 1px rgba(90, 160, 255, 0.65), 0 0 0 1px rgba(90, 160, 255, 0.16);
 }
 
+.key-card.assigned {
+  border-color: #36404c;
+}
+
 .key-card.selected {
   border-color: var(--accent);
+  background: linear-gradient(180deg, #131a22 0%, #0e131a 100%);
   box-shadow: inset 0 0 0 1px rgba(90, 160, 255, 0.65);
 }
 
@@ -305,70 +315,36 @@ select {
 
 .key-card-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  gap: 6px;
+  width: 100%;
   min-width: 0;
-  margin-bottom: 10px;
 }
 
 .key-label {
   font-family: "IBM Plex Mono", "Noto Sans Mono", monospace;
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.08em;
 }
 
-.key-state {
-  display: inline-flex;
-  align-items: center;
-  flex-shrink: 0;
-  min-height: 18px;
-  padding: 0 5px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: rgba(13, 18, 24, 0.9);
-  font-size: 9px;
-  letter-spacing: 0.05em;
-  white-space: nowrap;
-}
-
-.key-state.is-assigned {
-  color: #c5d7f7;
-}
-
-.key-led-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 10px;
-}
-
-.key-led-preview {
-  width: 10px;
-  height: 10px;
-  border-radius: 2px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: var(--key-led-color);
-  opacity: calc(0.22 + (0.78 * var(--key-led-opacity, 1)));
-}
-
-.key-led-value,
 .color-picker-copy strong,
 .inspector-preview-copy strong,
 .brightness-value {
   font-family: "IBM Plex Mono", "Noto Sans Mono", monospace;
 }
 
-.key-led-value {
-  color: var(--text-muted);
-  font-size: 11px;
-  white-space: nowrap;
-}
-
 .key-summary {
   margin: 0;
+  min-width: 0;
   font-size: 12px;
-  line-height: 1.45;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
 }
 
 .selection-badge {
@@ -689,8 +665,10 @@ select {
   }
 
   .topbar,
-  .footerbar {
+  .footerbar,
+  .section-header {
     align-items: stretch;
+    flex-direction: column;
   }
 
   .field-grid {
@@ -698,57 +676,20 @@ select {
   }
 
   .key-grid {
-    grid-template-columns: repeat(2, minmax(112px, 1fr));
-  }
-}
-
-@media (max-width: 760px) {
-  .app-shell {
-    padding: 12px;
-  }
-
-  .topbar,
-  .footerbar,
-  .section-panel,
-  .inspector-panel {
-    padding: 14px;
-  }
-
-  .topbar,
-  .section-header,
-  .footerbar,
-  .key-editor-header {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .header-statuses,
-  .status-grid,
-  .key-grid,
-  .inspector-actions,
-  .field-grid,
-  .key-editor-actions {
-    grid-template-columns: 1fr;
-  }
-
-  .header-statuses,
-  .inspector-actions,
-  .key-editor-actions {
-    display: grid;
-  }
-
-  .status-grid,
-  .key-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .color-picker-shell,
-  .key-editor-preview-row {
-    align-items: flex-start;
-    flex-direction: column;
+    grid-template-columns: repeat(2, minmax(110px, 118px));
   }
 
   .hex-input-row {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 430px) {
+  .device-shell {
+    width: 100%;
+  }
+
+  .key-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

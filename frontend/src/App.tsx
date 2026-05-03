@@ -91,6 +91,7 @@ export default function App() {
   }, [draftDirty, selectedIndex]);
 
   const selectedAssignment = dashboard.keyAssignments[selectedIndex] ?? createDefaultAssignment(selectedIndex);
+  const keyCount = dashboard.keyAssignments.length || 6;
   const assignedCount = dashboard.keyAssignments.filter(isAssigned).length;
   const configStateLabel = dashboard.dirty ? "Dirty" : "Saved";
   const saveButtonLabel = busy ? "Saving..." : "Save to Device";
@@ -222,15 +223,15 @@ export default function App() {
         <section className="panel section-panel layout-panel">
           <div className="section-header layout-header">
             <div>
-              <p className="section-kicker">Device</p>
-              <h2>HPAD Layout</h2>
+              <p className="section-kicker">Device Layout</p>
+              <h2>HPAD</h2>
             </div>
             <div className="layout-meta">
-              <span>{assignedCount}/6 assigned</span>
-              <span>{selectedAssignment.label} selected</span>
+              <span>{keyCount} keys</span>
+              <span>{assignedCount}/{keyCount} assigned</span>
             </div>
           </div>
-          <p className="section-copy">Select a key on the pad to inspect its action and LED settings.</p>
+          <p className="section-copy">Select a key to edit its action and LED.</p>
 
           <div className="layout-canvas">
             <div className="device-shell">
