@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"sync/atomic"
 
+	agentservice "hpad-app/internal/agentservice"
 	trayctrl "hpad-app/internal/tray"
 	ui "hpad-app/internal/ui"
 
@@ -19,7 +20,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	service, err := NewAgentService()
+	service, err := agentservice.NewAgentService()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -60,7 +61,7 @@ func main() {
 		app.Quit()
 	})
 	tray.SetMenu(trayMenu)
-	service.observeRuntimeStatus(trayController.Update)
+	service.ObserveRuntimeStatus(trayController.Update)
 
 	window := app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:            "HPAD",

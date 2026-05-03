@@ -23,7 +23,7 @@ var iconConnectedSource []byte
 var iconDisconnectedSource []byte
 
 //go:embed icons/hpad-charging.png
-var iconChargingSource []byte
+var iconUSBPowerSource []byte
 
 //go:embed icons/hpad-low-battery.png
 var iconLowBatterySource []byte
@@ -34,7 +34,7 @@ var iconErrorSource []byte
 var (
 	iconConnected    = mustSanitizeIcon(iconConnectedSource)
 	iconDisconnected = mustSanitizeIcon(iconDisconnectedSource)
-	iconCharging     = mustSanitizeIcon(iconChargingSource)
+	iconUSBPower     = mustSanitizeIcon(iconUSBPowerSource)
 	iconLowBattery   = mustSanitizeIcon(iconLowBatterySource)
 	iconError        = mustSanitizeIcon(iconErrorSource)
 )
@@ -50,7 +50,7 @@ type trayVisualState string
 const (
 	trayStateConnected    trayVisualState = "connected"
 	trayStateDisconnected trayVisualState = "disconnected"
-	trayStateCharging     trayVisualState = "charging"
+	trayStateUSBPower     trayVisualState = "usb_power"
 	trayStateLowBattery   trayVisualState = "lowbattery"
 	trayStateError        trayVisualState = "error"
 )
@@ -113,8 +113,8 @@ func iconForState(state trayVisualState) []byte {
 	switch state {
 	case trayStateConnected:
 		return iconConnected
-	case trayStateCharging:
-		return iconCharging
+	case trayStateUSBPower:
+		return iconUSBPower
 	case trayStateLowBattery:
 		return iconLowBattery
 	case trayStateError:
@@ -131,8 +131,8 @@ func classifyTrayState(status backend.RuntimeStatus) trayVisualState {
 	if !isFullyConnected(status.Dashboard) {
 		return trayStateDisconnected
 	}
-	if status.Dashboard.BatteryStatus.Charging {
-		return trayStateCharging
+	if status.Dashboard.BatteryStatus.USBPowerPresent {
+		return trayStateUSBPower
 	}
 	if isLowBattery(status.Dashboard.BatteryStatus.BatteryMV) {
 		return trayStateLowBattery
@@ -144,8 +144,8 @@ func buildTrayTooltip(status backend.RuntimeStatus, state trayVisualState) strin
 	switch state {
 	case trayStateError:
 		return "HPAD: Error detected. Check logs in a dev run for details."
-	case trayStateCharging:
-		return fmt.Sprintf("HPAD: Charging (%s)", status.Dashboard.BatteryStatus.Label)
+	case trayStateUSBPower:
+		return fmt.Sprintf("HPAD: USB power present (%s)", status.Dashboard.BatteryStatus.Label)
 	case trayStateLowBattery:
 		return fmt.Sprintf("HPAD: Low battery (%d%%)", batteryPercentageFromMV(status.Dashboard.BatteryStatus.BatteryMV))
 	case trayStateConnected:

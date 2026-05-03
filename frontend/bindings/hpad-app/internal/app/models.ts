@@ -14,7 +14,7 @@ export class BatteryStatus {
     "label": string;
     "detail": string;
     "batteryMV": number;
-    "charging": boolean;
+    "usbPowerPresent": boolean;
 
     /** Creates a new BatteryStatus instance. */
     constructor($$source: Partial<BatteryStatus> = {}) {
@@ -30,8 +30,8 @@ export class BatteryStatus {
         if (!("batteryMV" in $$source)) {
             this["batteryMV"] = 0;
         }
-        if (!("charging" in $$source)) {
-            this["charging"] = false;
+        if (!("usbPowerPresent" in $$source)) {
+            this["usbPowerPresent"] = false;
         }
 
         Object.assign(this, $$source);

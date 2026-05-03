@@ -23,9 +23,9 @@ func TestClassifyTrayState(t *testing.T) {
 			want: trayStateError,
 		},
 		{
-			name:   "charging wins over low battery",
+			name:   "usb power wins over low battery",
 			status: backend.RuntimeStatus{Dashboard: connectedDashboardState(3200, true)},
-			want:   trayStateCharging,
+			want:   trayStateUSBPower,
 		},
 		{
 			name:   "low battery when connected at threshold",
@@ -132,22 +132,22 @@ func TestTrayControllerRecordPresentationDedupesRenderedState(t *testing.T) {
 		t.Fatalf("battery-only change should only update tooltip, got iconChanged=%v tooltipChanged=%v", iconChanged, tooltipChanged)
 	}
 
-	charging := buildTrayPresentation(backend.RuntimeStatus{
+	usbPower := buildTrayPresentation(backend.RuntimeStatus{
 		Dashboard: connectedDashboardState(4010, true),
 	})
-	if iconChanged, tooltipChanged := controller.recordPresentation(charging); !iconChanged || !tooltipChanged {
-		t.Fatalf("charging change should update icon and tooltip, got iconChanged=%v tooltipChanged=%v", iconChanged, tooltipChanged)
+	if iconChanged, tooltipChanged := controller.recordPresentation(usbPower); !iconChanged || !tooltipChanged {
+		t.Fatalf("usb power change should update icon and tooltip, got iconChanged=%v tooltipChanged=%v", iconChanged, tooltipChanged)
 	}
 }
 
-func connectedDashboardState(batteryMV int, charging bool) backend.DashboardState {
+func connectedDashboardState(batteryMV int, usbPowerPresent bool) backend.DashboardState {
 	return backend.DashboardState{
 		DongleStatus:   backend.DeviceConnectionStatus{State: "connected"},
 		MacropadStatus: backend.DeviceConnectionStatus{State: "connected"},
 		BatteryStatus: backend.BatteryStatus{
-			BatteryMV: batteryMV,
-			Charging:  charging,
-			Label:     "battery",
+			BatteryMV:       batteryMV,
+			USBPowerPresent: usbPowerPresent,
+			Label:           "battery",
 		},
 	}
 }

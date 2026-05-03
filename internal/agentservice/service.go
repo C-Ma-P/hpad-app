@@ -1,4 +1,4 @@
-package main
+package agentservice
 
 import (
 	"context"
@@ -51,6 +51,6 @@ func (s *AgentService) SaveToDevice() (backend.DashboardState, error) {
 	return s.core.SaveToDevice()
 }
 
-func (s *AgentService) observeRuntimeStatus(observer func(backend.RuntimeStatus)) {
-	s.core.SetRuntimeStatusObserver(observer)
+func ObserveRuntimeStatus(service *AgentService, observer func(backend.RuntimeStatus)) {
+	service.core.SetRuntimeStatusObserver(observer)
 }

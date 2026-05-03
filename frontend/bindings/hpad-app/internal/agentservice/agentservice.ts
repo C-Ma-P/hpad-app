@@ -7,37 +7,37 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import * as app$0 from "./internal/app/models.js";
+import * as app$0 from "../app/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import * as config$0 from "./internal/config/models.js";
+import * as config$0 from "../config/models.js";
 
 export function ApplyKeyAction(index: number, action: config$0.KeyAction): $CancellablePromise<app$0.DashboardState> {
-    return $Call.ByID(864729253, index, action).then(($result: any) => {
+    return $Call.ByID(1905372150, index, action).then(($result: any) => {
         return $$createType0($result);
     });
 }
 
 export function ApplyKeySettings(index: number, action: config$0.KeyAction, color: string, brightness: number): $CancellablePromise<app$0.DashboardState> {
-    return $Call.ByID(3857731378, index, action, color, brightness).then(($result: any) => {
+    return $Call.ByID(226223513, index, action, color, brightness).then(($result: any) => {
         return $$createType0($result);
     });
 }
 
 export function ClearKeyAction(index: number): $CancellablePromise<app$0.DashboardState> {
-    return $Call.ByID(17620114, index).then(($result: any) => {
+    return $Call.ByID(1702418321, index).then(($result: any) => {
         return $$createType0($result);
     });
 }
 
 export function GetDashboardState(): $CancellablePromise<app$0.DashboardState> {
-    return $Call.ByID(1070296609).then(($result: any) => {
+    return $Call.ByID(4213142764).then(($result: any) => {
         return $$createType0($result);
     });
 }
 
 export function SaveToDevice(): $CancellablePromise<app$0.DashboardState> {
-    return $Call.ByID(437581394).then(($result: any) => {
+    return $Call.ByID(3963280321).then(($result: any) => {
         return $$createType0($result);
     });
 }

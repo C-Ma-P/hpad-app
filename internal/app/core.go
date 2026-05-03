@@ -23,11 +23,11 @@ type DeviceConnectionStatus struct {
 }
 
 type BatteryStatus struct {
-	State     string `json:"state"`
-	Label     string `json:"label"`
-	Detail    string `json:"detail"`
-	BatteryMV int    `json:"batteryMV"`
-	Charging  bool   `json:"charging"`
+	State           string `json:"state"`
+	Label           string `json:"label"`
+	Detail          string `json:"detail"`
+	BatteryMV       int    `json:"batteryMV"`
+	USBPowerPresent bool   `json:"usbPowerPresent"`
 }
 
 type DashboardState struct {
@@ -223,14 +223,20 @@ func (c *Core) ClearKeyAction(index int) (DashboardState, error) {
 
 func (c *Core) SaveToDevice() (DashboardState, error) {
 	c.mu.Lock()
+	cfg := config.Clone(c.config)
+	manager := c.device
+	c.mu.Unlock()
+
+	if err := c.store.Save(cfg); err != nil {
+		return DashboardState{}, err
+	}
+	if err := syncKeyLEDConfig(manager, cfg); err != nil {
+		return DashboardState{}, err
+	}
+
+	c.mu.Lock()
 	defer c.mu.Unlock()
-	if err := c.store.Save(c.config); err != nil {
-		return DashboardState{}, err
-	}
-	if err := syncKeyLEDConfig(c.device, c.config); err != nil {
-		return DashboardState{}, err
-	}
-	c.persisted = config.Clone(c.config)
+	c.persisted = config.Clone(cfg)
 	c.updateConfigStateLocked()
 	return c.snapshotLocked(), nil
 }
@@ -365,18 +371,6 @@ func newDashboardState(cfg config.Config) DashboardState {
 	}
 }
 
-func disconnectedDongleStatus(reason string) DeviceConnectionStatus {
-	detail := "USB HID dongle not detected"
-	if reason != "" {
-		detail = reason
-	}
-	return DeviceConnectionStatus{
-		State:  "not_detected",
-		Label:  "Not Detected",
-		Detail: detail,
-	}
-}
-
 func syncKeyLEDConfig(syncer keyLEDSyncer, cfg config.Config) error {
 	if syncer == nil {
 		return errors.New("dongle not connected")
@@ -429,67 +423,6 @@ func parseColorBytes(color string) ([3]byte, error) {
 	return rgb, nil
 }
 
-func unknownMacropadStatus() DeviceConnectionStatus {
-	return DeviceConnectionStatus{
-		State:  "unknown",
-		Label:  "Unknown",
-		Detail: "Waiting for dongle",
-	}
-}
-
-func disconnectedMacropadStatus() DeviceConnectionStatus {
-	return DeviceConnectionStatus{
-		State:  "disconnected",
-		Label:  "Disconnected",
-		Detail: "Dongle is online, waiting for the wireless macropad",
-	}
-}
-
-func connectedMacropadStatus() DeviceConnectionStatus {
-	return DeviceConnectionStatus{
-		State:  "connected",
-		Label:  "Connected",
-		Detail: "Wireless macropad is reporting through the dongle",
-	}
-}
-
-func waitingBatteryStatus() BatteryStatus {
-	return BatteryStatus{
-		State:     "waiting",
-		Label:     "--.- V",
-		Detail:    "Waiting for device report",
-		BatteryMV: 0,
-		Charging:  false,
-	}
-}
-
-func batteryStatusFromReport(report device.Report) BatteryStatus {
-	if report.BatteryMV == 0 {
-		return waitingBatteryStatus()
-	}
-
-	detail := "Running on battery power"
-	state := "connected"
-	if report.Charging {
-		detail = "Charging over USB"
-		state = "charging"
-	}
-
-	return BatteryStatus{
-		State:     state,
-		Label:     formatBatteryMV(report.BatteryMV),
-		Detail:    detail,
-		BatteryMV: int(report.BatteryMV),
-		Charging:  report.Charging,
-	}
-}
-
-func formatBatteryMV(batteryMV uint16) string {
-	whole := batteryMV / 1000
-	fraction := (batteryMV % 1000) / 10
-	return fmt.Sprintf("%d.%02d V", whole, fraction)
-}
-
 func newIndexError(index int) error {
-	return errors.New("invalid key index")
+	return fmt.Errorf("invalid key index: %d", index)
 }
