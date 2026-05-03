@@ -30,6 +30,7 @@ func main() {
 	app := application.New(application.Options{
 		Name:        "HPAD",
 		Description: "HPAD desktop configurator",
+		Icon:        trayctrl.DefaultAppIcon(),
 		LogLevel:    slog.LevelInfo,
 		ShouldQuit: func() bool {
 			return allowQuit.Load()
@@ -50,7 +51,6 @@ func main() {
 			Handler: application.BundledAssetFileServer(frontendAssets),
 		},
 	})
-	app.SetIcon(trayctrl.DefaultAppIcon())
 
 	tray := app.SystemTray.New()
 	trayController := trayctrl.NewTrayController(tray)
@@ -85,11 +85,7 @@ func main() {
 		event.Cancel()
 	})
 
-	tray.OnClick(func() {
-		window.UnMinimise()
-		window.Show().Focus()
-	})
-	tray.OnRightClick(tray.OpenMenu)
+	trayctrl.BindWindowToTrayClicks(tray, window)
 
 	if err := app.Run(); err != nil {
 		log.Fatal(err)

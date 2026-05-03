@@ -6,6 +6,7 @@ require (
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/sstallion/go-hid v0.15.0
 	github.com/wailsapp/wails/v3 v3.0.0-alpha.78
+	golang.org/x/image v0.35.0
 )
 
 require (

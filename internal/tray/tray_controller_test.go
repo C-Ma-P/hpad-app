@@ -2,6 +2,8 @@ package tray
 
 import (
 	"bytes"
+	"image"
+	"image/color"
 	"image/png"
 	"testing"
 
@@ -95,6 +97,21 @@ func TestSanitizeIconClearsOnlyBackground(t *testing.T) {
 		t.Fatalf("background alpha = %d, want 0", backgroundAlpha)
 	}
 
+	contentBounds, ok := nonTransparentBounds(decoded)
+	if !ok {
+		t.Fatal("expected sanitized icon to retain visible content")
+	}
+
+	widthFill := float64(contentBounds.Dx()) / float64(decoded.Bounds().Dx())
+	heightFill := float64(contentBounds.Dy()) / float64(decoded.Bounds().Dy())
+	dominantFill := widthFill
+	if heightFill > dominantFill {
+		dominantFill = heightFill
+	}
+	if dominantFill < trayIconTargetFill-0.02 || widthFill < 0.90 || heightFill < 0.90 {
+		t.Fatalf("sanitized icon still leaves too much padding: width fill=%.2f height fill=%.2f", widthFill, heightFill)
+	}
+
 	interiorPixel := decoded.At(450, 450)
 	_, _, _, interiorAlpha := interiorPixel.RGBA()
 	if interiorAlpha != 0xffff {
@@ -106,6 +123,67 @@ func TestSanitizeIconClearsOnlyBackground(t *testing.T) {
 	}
 	if red < 0xd000 || green < 0xd000 || blue < 0xd000 {
 		t.Fatalf("interior pixel lost its light fill: got (%d,%d,%d)", red, green, blue)
+	}
+}
+
+func TestDefaultAppIconKeepsTransparentBackground(t *testing.T) {
+	decoded, err := png.Decode(bytes.NewReader(DefaultAppIcon()))
+	if err != nil {
+		t.Fatalf("png.Decode() error = %v", err)
+	}
+
+	backgroundPixel := decoded.At(0, 0)
+	_, _, _, backgroundAlpha := backgroundPixel.RGBA()
+	if backgroundAlpha != 0 {
+		t.Fatalf("background alpha = %d, want 0", backgroundAlpha)
+	}
+
+	contentBounds, ok := nonTransparentBoundsAtAlpha(decoded, appIconAlphaThreshold)
+	if !ok {
+		t.Fatal("expected app icon to retain visible content")
+	}
+
+	widthFill := float64(contentBounds.Dx()) / float64(decoded.Bounds().Dx())
+	heightFill := float64(contentBounds.Dy()) / float64(decoded.Bounds().Dy())
+	dominantFill := widthFill
+	if heightFill > dominantFill {
+		dominantFill = heightFill
+	}
+	if dominantFill < trayIconTargetFill-0.02 || widthFill < 0.89 || heightFill < 0.90 {
+		t.Fatalf("app icon still leaves too much padding: width fill=%.2f height fill=%.2f", widthFill, heightFill)
+	}
+
+	leftMargin := contentBounds.Min.X - decoded.Bounds().Min.X
+	rightMargin := decoded.Bounds().Max.X - contentBounds.Max.X
+	topMargin := contentBounds.Min.Y - decoded.Bounds().Min.Y
+	bottomMargin := decoded.Bounds().Max.Y - contentBounds.Max.Y
+	if absInt(leftMargin-rightMargin) > 3 || absInt(topMargin-bottomMargin) > 3 {
+		t.Fatalf("app icon visual bounds are off-center: left=%d right=%d top=%d bottom=%d", leftMargin, rightMargin, topMargin, bottomMargin)
+	}
+}
+
+func TestRemoveDisconnectedArtifactsKeepsLargestComponent(t *testing.T) {
+	img := image.NewNRGBA(image.Rect(0, 0, 8, 8))
+	for y := 2; y <= 5; y++ {
+		for x := 2; x <= 5; x++ {
+			img.SetNRGBA(x, y, color.NRGBA{R: 20, G: 20, B: 20, A: 0xff})
+		}
+	}
+	img.SetNRGBA(0, 0, color.NRGBA{R: 255, G: 255, B: 255, A: 0xff})
+	img.SetNRGBA(7, 1, color.NRGBA{R: 255, G: 255, B: 255, A: 0xff})
+
+	removeDisconnectedArtifacts(img)
+
+	if img.NRGBAAt(0, 0).A != 0 || img.NRGBAAt(7, 1).A != 0 {
+		t.Fatal("expected disconnected artifacts to be cleared")
+	}
+
+	for y := 2; y <= 5; y++ {
+		for x := 2; x <= 5; x++ {
+			if img.NRGBAAt(x, y).A == 0 {
+				t.Fatalf("expected largest component pixel (%d,%d) to remain", x, y)
+			}
+		}
 	}
 }
 
@@ -164,4 +242,11 @@ func disconnectedDashboardState() backend.DashboardState {
 		DongleStatus:   backend.DeviceConnectionStatus{State: "not_detected"},
 		MacropadStatus: backend.DeviceConnectionStatus{State: "unknown"},
 	}
+}
+
+func absInt(value int) int {
+	if value < 0 {
+		return -value
+	}
+	return value
 }
