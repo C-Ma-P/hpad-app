@@ -9,30 +9,20 @@ import {
 import { DashboardState } from "../bindings/hpad-app/internal/app/models.js";
 import { KeyAction, KeyAssignment } from "../bindings/hpad-app/internal/config/models.js";
 
+import { KeyInspector } from "./components/KeyInspector";
 import { KeyGrid } from "./components/KeyGrid";
-import { StatusCard, StatusChip } from "./components/StatusCard";
+import { StatusChip } from "./components/StatusCard";
 import {
-  ACTION_KEYBOARD_SHORTCUT,
-  ACTION_MEDIA_CONTROL,
-  ACTION_OPEN_APPLICATION,
-  ACTION_RUN_COMMAND,
-  ACTION_UNASSIGNED,
-  actionOptions,
   copyAction,
   createEmptyAction,
-  getActionSummary,
-  mediaOptions,
+  isAssigned,
   normalizeAction,
-  showDeferredWiringNote,
 } from "./domain/action";
 import {
-  BRIGHTNESS_MAX,
   DEFAULT_KEY_BRIGHTNESS,
   DEFAULT_KEY_COLOR,
-  formatBrightnessPercent,
   getAssignmentBrightness,
   getAssignmentColor,
-  getColorStyle,
   isValidColor,
   normalizeBrightness,
   normalizeColor,
@@ -44,7 +34,6 @@ const STATUS_REFRESH_MS = 2500;
 export default function App() {
   const [dashboard, setDashboard] = useState<DashboardState>(() => createEmptyDashboardState());
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [editorOpen, setEditorOpen] = useState(false);
   const [draftAction, setDraftAction] = useState<KeyAction>(() => createEmptyAction());
   const [draftColor, setDraftColor] = useState(DEFAULT_KEY_COLOR);
   const [draftColorInput, setDraftColorInput] = useState(DEFAULT_KEY_COLOR);
@@ -102,22 +91,21 @@ export default function App() {
   }, [draftDirty, selectedIndex]);
 
   const selectedAssignment = dashboard.keyAssignments[selectedIndex] ?? createDefaultAssignment(selectedIndex);
-  const configStateLabel = dashboard.dirty ? "Unsaved Changes" : "Saved";
+  const assignedCount = dashboard.keyAssignments.filter(isAssigned).length;
+  const configStateLabel = dashboard.dirty ? "Dirty" : "Saved";
   const saveButtonLabel = busy ? "Saving..." : "Save to Device";
 
   const handleSelectKey = (index: number) => {
     setSelectedIndex(index);
     hydrateDraft(dashboard.keyAssignments[index]);
-    setEditorOpen(true);
     setErrorMessage(null);
   };
 
-  const handleCloseEditor = () => {
+  const handleRevert = () => {
     if (busy) {
       return;
     }
     hydrateDraft(dashboard.keyAssignments[selectedIndex]);
-    setEditorOpen(false);
   };
 
   const handleActionTypeChange = (nextType: string) => {
@@ -174,7 +162,6 @@ export default function App() {
       );
       setDashboard(next);
       hydrateDraft(next.keyAssignments[selectedIndex]);
-      setEditorOpen(false);
       setErrorMessage(null);
     } catch (error) {
       setErrorMessage(getErrorMessage(error));
@@ -212,280 +199,89 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <div className="backdrop-grid" aria-hidden="true" />
       <header className="topbar panel">
-        <div className="brand-block">
-          <p className="eyebrow">HPAD</p>
-          <h1>HPAD</h1>
-          <p className="subtitle">Compact desktop control panel for a six-key macropad.</p>
+        <div className="toolbar-brand">
+          <span className="app-title">HPAD</span>
+          <div className="toolbar-profile">
+            <span className="toolbar-label">Profile</span>
+            <strong>{dashboard.profile}</strong>
+          </div>
         </div>
-        <div className="header-statuses">
+        <div className="toolbar-strip">
           <StatusChip title="Dongle" status={dashboard.dongleStatus.label} tone={dashboard.dongleStatus.state} />
           <StatusChip title="Macropad" status={dashboard.macropadStatus.label} tone={dashboard.macropadStatus.state} />
-          <StatusChip title="Battery" status={getBatteryChipStatus(dashboard.batteryStatus)} tone={dashboard.batteryStatus.state} />
+          <StatusChip title="Power" status={getBatteryChipStatus(dashboard.batteryStatus)} tone={dashboard.batteryStatus.state} />
+          <div className={`toolbar-state ${dashboard.dirty ? "dirty" : "saved"}`}>
+            <span className="toolbar-label">Config</span>
+            <strong>{configStateLabel}</strong>
+          </div>
         </div>
       </header>
 
-      {errorMessage ? <div className="error-banner">{errorMessage}</div> : null}
+      <main className="workspace">
+        <section className="panel section-panel layout-panel">
+          <div className="section-header layout-header">
+            <div>
+              <p className="section-kicker">Device</p>
+              <h2>HPAD Layout</h2>
+            </div>
+            <div className="layout-meta">
+              <span>{assignedCount}/6 assigned</span>
+              <span>{selectedAssignment.label} selected</span>
+            </div>
+          </div>
+          <p className="section-copy">Select a key on the pad to inspect its action and LED settings.</p>
 
-      <div className="workspace">
-        <div className="main-column">
-          <section className="panel section-panel">
-            <div className="section-header">
-              <div>
-                <p className="section-kicker">Overview</p>
-                <h2>Device Status</h2>
-              </div>
-              <div className="profile-pill">{dashboard.profile}</div>
+          <div className="layout-canvas">
+            <div className="device-shell">
+              <KeyGrid keyAssignments={dashboard.keyAssignments} selectedIndex={selectedIndex} onSelect={handleSelectKey} />
             </div>
-            <div className="status-grid">
-              <StatusCard
-                title="Dongle"
-                status={dashboard.dongleStatus.label}
-                detail={dashboard.dongleStatus.path || dashboard.dongleStatus.detail}
-                tone={dashboard.dongleStatus.state}
-              />
-              <StatusCard
-                title="Macropad"
-                status={dashboard.macropadStatus.label}
-                detail={dashboard.macropadStatus.detail}
-                tone={dashboard.macropadStatus.state}
-              />
-              <StatusCard
-                title="Battery"
-                status={dashboard.batteryStatus.label}
-                detail={dashboard.batteryStatus.detail}
-                tone={dashboard.batteryStatus.state}
-              />
-            </div>
-          </section>
+          </div>
+        </section>
 
-          <section className="panel section-panel">
-            <div className="section-header">
-              <div>
-                <p className="section-kicker">Layout</p>
-                <h2>Key Assignments</h2>
-              </div>
-              <p className="section-copy">Click a key to open its action and LED color menu.</p>
-            </div>
-            <KeyGrid
-              keyAssignments={dashboard.keyAssignments}
-              editorOpen={editorOpen}
-              selectedIndex={selectedIndex}
-              onSelect={handleSelectKey}
-            />
-          </section>
-        </div>
-      </div>
+        <KeyInspector
+          assignment={selectedAssignment}
+          draftAction={draftAction}
+          draftColor={draftColor}
+          draftColorInput={draftColorInput}
+          draftBrightness={draftBrightness}
+          draftDirty={draftDirty}
+          busy={busy}
+          onActionTypeChange={handleActionTypeChange}
+          onDraftFieldChange={handleDraftFieldChange}
+          onColorPickerChange={handleColorPickerChange}
+          onColorInputChange={handleColorInputChange}
+          onColorInputBlur={handleColorInputBlur}
+          onResetColor={handleResetColor}
+          onBrightnessChange={handleBrightnessChange}
+          onClear={handleClear}
+          onRevert={handleRevert}
+          onApply={handleApply}
+        />
+      </main>
 
       <footer className="footerbar panel">
-        <div className="footer-state-block">
+        <div className="footer-status-line">
           <span className={`footer-state ${dashboard.dirty ? "dirty" : "saved"}`}>{configStateLabel}</span>
           <span className="footer-copy">
-            {dashboard.dirty ? "Changes are staged in the layout and not yet saved to the device." : "Configuration is in sync with the saved layout."}
+            {dashboard.dirty ? "Changes pending save to device." : "Configuration synced to device."}
           </span>
+          {errorMessage ? (
+            <span className="footer-error">{errorMessage}</span>
+          ) : (
+            <span className="footer-hint">
+              {draftDirty ? `${selectedAssignment.label} has unapplied inspector changes.` : "No recent errors."}
+            </span>
+          )}
         </div>
         <button type="button" className="button button-primary footer-button" onClick={handleSave} disabled={busy || !dashboard.dirty}>
           {saveButtonLabel}
         </button>
       </footer>
 
-      {editorOpen ? (
-        <div className="key-editor-backdrop" onClick={handleCloseEditor}>
-          <section
-            className="panel key-editor-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="key-editor-title"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="key-editor-header">
-              <div>
-                <p className="section-kicker">Key Menu</p>
-                <h2 id="key-editor-title">{selectedAssignment.label}</h2>
-                <p className="section-copy">Set the action, RGB LED color, and brightness for this key.</p>
-              </div>
-              <button type="button" className="button button-secondary" onClick={handleCloseEditor} disabled={busy}>
-                Close
-              </button>
-            </div>
-
-            <div className="key-editor-preview" style={getColorStyle(draftColor, draftBrightness)}>
-              <span className="selection-badge">Preview</span>
-              <div className="key-editor-preview-row">
-                <span className="key-led-preview key-led-preview-large" aria-hidden="true" />
-                <div>
-                  <strong>{draftColor}</strong>
-                  <p>{formatBrightnessPercent(draftBrightness)} brightness · {getActionSummary(draftAction)}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="field-stack">
-              <label className="field">
-                <span>Action Type</span>
-                <select
-                  value={draftAction.type || ACTION_UNASSIGNED}
-                  onChange={(event) => handleActionTypeChange(event.target.value)}
-                >
-                  {actionOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              {renderActionFields(draftAction, handleDraftFieldChange)}
-
-              <div className="field-grid">
-                <label className="field">
-                  <span>LED Color</span>
-                  <div className="color-picker-shell">
-                    <input
-                      className="color-picker-input"
-                      type="color"
-                      value={draftColor}
-                      onChange={(event) => handleColorPickerChange(event.target.value)}
-                    />
-                    <div className="color-picker-copy">
-                      <strong>{draftColor}</strong>
-                      <p className="field-note">Uses the platform native wheel or square RGB picker.</p>
-                    </div>
-                  </div>
-                </label>
-
-                <label className="field">
-                  <span>Hex Code</span>
-                  <div className="hex-input-row">
-                    <input
-                      type="text"
-                      value={draftColorInput}
-                      onChange={(event) => handleColorInputChange(event.target.value)}
-                      onBlur={handleColorInputBlur}
-                      placeholder="#FF6B00"
-                      maxLength={7}
-                    />
-                    <button type="button" className="button button-secondary" onClick={handleResetColor}>
-                      Off
-                    </button>
-                  </div>
-                </label>
-              </div>
-
-              <label className="field">
-                <span>Brightness</span>
-                <div className="brightness-row">
-                  <input
-                    className="brightness-slider"
-                    type="range"
-                    min={0}
-                    max={BRIGHTNESS_MAX}
-                    step={1}
-                    value={draftBrightness}
-                    onChange={(event) => handleBrightnessChange(Number(event.target.value))}
-                  />
-                  <div className="brightness-value">{formatBrightnessPercent(draftBrightness)}</div>
-                </div>
-                <p className="field-note">0% turns the LED off. 100% sends the stored color at full brightness.</p>
-              </label>
-
-              {showDeferredWiringNote(draftAction.type) ? (
-                <p className="field-note">This action is stored now and can be wired to device execution later.</p>
-              ) : null}
-            </div>
-
-            <div className="key-editor-actions">
-              <button type="button" className="button button-secondary" onClick={handleClear} disabled={busy}>
-                Clear action
-              </button>
-              <button type="button" className="button button-secondary" onClick={handleCloseEditor} disabled={busy}>
-                Cancel
-              </button>
-              <button type="button" className="button button-primary" onClick={handleApply} disabled={busy || !draftDirty}>
-                Apply
-              </button>
-            </div>
-          </section>
-        </div>
-      ) : null}
-
       {loading ? <div className="loading-mask">Loading HPAD state...</div> : null}
     </div>
   );
-}
-
-function renderActionFields(
-  action: KeyAction,
-  onChange: (field: keyof KeyAction, value: string) => void,
-) {
-  switch (action.type || ACTION_UNASSIGNED) {
-    case ACTION_KEYBOARD_SHORTCUT:
-      return (
-        <label className="field">
-          <span>Shortcut</span>
-          <input
-            type="text"
-            value={action.shortcut ?? ""}
-            onChange={(event) => onChange("shortcut", event.target.value)}
-            placeholder="Ctrl+Shift+P"
-          />
-        </label>
-      );
-    case ACTION_RUN_COMMAND:
-      return (
-        <>
-          <label className="field">
-            <span>Command</span>
-            <input
-              type="text"
-              value={action.command ?? ""}
-              onChange={(event) => onChange("command", event.target.value)}
-              placeholder="/usr/bin/playerctl"
-            />
-          </label>
-          <label className="field">
-            <span>Arguments</span>
-            <input
-              type="text"
-              value={action.arguments ?? ""}
-              onChange={(event) => onChange("arguments", event.target.value)}
-              placeholder="play-pause"
-            />
-          </label>
-        </>
-      );
-    case ACTION_OPEN_APPLICATION:
-      return (
-        <label className="field">
-          <span>Application</span>
-          <input
-            type="text"
-            value={action.application ?? ""}
-            onChange={(event) => onChange("application", event.target.value)}
-            placeholder="/usr/bin/code"
-          />
-        </label>
-      );
-    case ACTION_MEDIA_CONTROL:
-      return (
-        <label className="field">
-          <span>Media Control</span>
-          <select
-            value={action.mediaControl ?? mediaOptions[0].value}
-            onChange={(event) => onChange("mediaControl", event.target.value)}
-          >
-            {mediaOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
-      );
-    default:
-      return <p className="field-note">No action is assigned to this key.</p>;
-  }
 }
 
 function createEmptyDashboardState() {
@@ -515,11 +311,22 @@ function createDefaultAssignment(index: number) {
 }
 
 function getErrorMessage(error: unknown) {
-  if (error instanceof Error) {
-    return error.message;
+  const rawMessage = error instanceof Error ? error.message : typeof error === "string" ? error : "";
+
+  if (!rawMessage) {
+    return "The HPAD backend request failed.";
   }
-  if (typeof error === "string") {
-    return error;
+
+  if (rawMessage.includes("Unsupported method ('POST')") || rawMessage.includes("/wails/runtime")) {
+    return "Backend unavailable in browser preview.";
   }
-  return "The HPAD backend request failed.";
+
+  const htmlTitle = rawMessage.match(/<h1>([^<]+)<\/h1>/i)?.[1];
+  const htmlMessage = rawMessage.match(/<p>Message:\s*([^<]+)<\/p>/i)?.[1];
+  if (htmlTitle || htmlMessage) {
+    return [htmlTitle, htmlMessage].filter(Boolean).join(": ");
+  }
+
+  const normalized = rawMessage.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  return normalized || "The HPAD backend request failed.";
 }
