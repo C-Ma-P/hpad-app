@@ -1,0 +1,16 @@
+[Unit]
+Description=HPAD desktop controller
+Documentation=https://github.com/C-Ma-P/hpad-app
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/hpad
+Restart=on-failure
+RestartSec=2
+WorkingDirectory=%h
+Environment=HPAD_ENV=production
+
+[Install]
+WantedBy=default.target

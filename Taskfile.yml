@@ -1,7 +1,7 @@
 version: '3'
 
 vars:
-  APP_NAME: hpad-agent
+  APP_NAME: hpad
   BIN_DIR: bin
   VITE_PORT: '{{.WAILS_VITE_PORT | default 9245}}'
 
@@ -53,6 +53,8 @@ tasks:
       - go build -buildvcs=false -gcflags=all="-l" -o {{.BIN_DIR}}/{{.APP_NAME}} .
 
   run:
+    deps:
+      - task: build
     cmds:
       - ./{{.BIN_DIR}}/{{.APP_NAME}}
 
@@ -65,6 +67,8 @@ tasks:
       - go build -tags production -trimpath -buildvcs=false -ldflags="-w -s" -o {{.BIN_DIR}}/{{.APP_NAME}} .
 
   linux:run:
+    deps:
+      - task: linux:build
     cmds:
       - ./{{.BIN_DIR}}/{{.APP_NAME}}
 
@@ -76,4 +80,36 @@ tasks:
 
   dev:
     cmds:
+      - systemctl --user stop hpad.service || true
       - wails3 dev -config ./build/config.yml
+
+  install-user:
+    deps:
+      - task: build
+    cmds:
+      - bash ./scripts/install-user.sh
+
+  uninstall-user:
+    cmds:
+      - bash ./scripts/uninstall-user.sh
+
+  start-user:
+    cmds:
+      - systemctl --user start hpad.service
+
+  stop-user:
+    cmds:
+      - systemctl --user stop hpad.service
+
+  restart-user:
+    cmds:
+      - systemctl --user daemon-reload
+      - systemctl --user restart hpad.service
+
+  status:
+    cmds:
+      - systemctl --user status hpad.service
+
+  logs:
+    cmds:
+      - journalctl --user -u hpad.service -f

@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"hpad-app/internal/appdirs"
 )
 
 const keyCount = 6
@@ -35,11 +37,11 @@ type KeyAction struct {
 }
 
 type KeyAssignment struct {
-	ID     string    `json:"id"`
-	Label  string    `json:"label"`
-	Color  string    `json:"color"`
-	Brightness *uint8 `json:"brightness,omitempty"`
-	Action KeyAction `json:"action"`
+	ID         string    `json:"id"`
+	Label      string    `json:"label"`
+	Color      string    `json:"color"`
+	Brightness *uint8    `json:"brightness,omitempty"`
+	Action     KeyAction `json:"action"`
 }
 
 type Config struct {
@@ -57,15 +59,19 @@ type legacyKey struct {
 }
 
 type Store struct {
-	path string
+	path       string
+	legacyPath string
 }
 
 func NewStore() (*Store, error) {
-	base, err := os.UserConfigDir()
+	paths, err := appdirs.Resolve()
 	if err != nil {
 		return nil, err
 	}
-	return &Store{path: filepath.Join(base, "hpad-agent", "config.json")}, nil
+	return &Store{
+		path:       filepath.Join(paths.ConfigDir, "config.json"),
+		legacyPath: filepath.Join(filepath.Dir(paths.ConfigDir), "hpad-agent", "config.json"),
+	}, nil
 }
 
 func (s *Store) Path() string {
@@ -73,11 +79,11 @@ func (s *Store) Path() string {
 }
 
 func (s *Store) Load() (Config, error) {
-	if err := os.MkdirAll(filepath.Dir(s.path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(s.path), 0o700); err != nil {
 		return Config{}, err
 	}
 
-	data, err := os.ReadFile(s.path)
+	data, err := s.readConfigData()
 	if errors.Is(err, os.ErrNotExist) {
 		cfg := Default()
 		if err := s.Save(cfg); err != nil {
@@ -107,7 +113,7 @@ func (s *Store) Save(cfg Config) error {
 		return err
 	}
 
-	if err := os.MkdirAll(filepath.Dir(s.path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(s.path), 0o700); err != nil {
 		return err
 	}
 
@@ -117,6 +123,31 @@ func (s *Store) Save(cfg Config) error {
 	}
 	data = append(data, '\n')
 	return os.WriteFile(s.path, data, 0o644)
+}
+
+func (s *Store) readConfigData() ([]byte, error) {
+	data, err := os.ReadFile(s.path)
+	if err == nil {
+		return data, nil
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
+	if s.legacyPath == "" || s.legacyPath == s.path {
+		return nil, err
+	}
+
+	legacyData, legacyErr := os.ReadFile(s.legacyPath)
+	if legacyErr == nil {
+		if writeErr := os.WriteFile(s.path, legacyData, 0o644); writeErr != nil {
+			return nil, writeErr
+		}
+		return legacyData, nil
+	}
+	if !errors.Is(legacyErr, os.ErrNotExist) {
+		return nil, legacyErr
+	}
+	return nil, err
 }
 
 func Default() Config {
@@ -271,11 +302,11 @@ func NormalizeAction(action KeyAction) KeyAction {
 func defaultAssignment(index int) KeyAssignment {
 	name := fmt.Sprintf("K%d", index+1)
 	return KeyAssignment{
-		ID:     name,
-		Label:  name,
-		Color:  defaultKeyColor,
+		ID:         name,
+		Label:      name,
+		Color:      defaultKeyColor,
 		Brightness: brightnessPtr(defaultKeyBrightness),
-		Action: ClearAction(),
+		Action:     ClearAction(),
 	}
 }
 
@@ -308,11 +339,11 @@ func normalizeLegacyAssignments(keys []legacyKey) []KeyAssignment {
 			}
 		}
 		assignments = append(assignments, KeyAssignment{
-			ID:     fmt.Sprintf("K%d", index+1),
-			Label:  strings.TrimSpace(key.Label),
-			Color:  defaultKeyColor,
+			ID:         fmt.Sprintf("K%d", index+1),
+			Label:      strings.TrimSpace(key.Label),
+			Color:      defaultKeyColor,
 			Brightness: brightnessPtr(defaultKeyBrightness),
-			Action: NormalizeAction(action),
+			Action:     NormalizeAction(action),
 		})
 	}
 	return assignments

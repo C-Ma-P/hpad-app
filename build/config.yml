@@ -3,7 +3,7 @@ version: '3'
 info:
   companyName: C-Ma-P
   productName: HPAD
-  productIdentifier: io.github.cmap.hpadagent
+  productIdentifier: io.github.cmap.hpad
   description: HPAD desktop configurator
   copyright: (c) 2026, C-Ma-P
   comments: HPAD desktop configurator

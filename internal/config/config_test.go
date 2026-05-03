@@ -1,6 +1,10 @@
 package config
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
 
 func testBrightnessPtr(value uint8) *uint8 {
 	brightness := value
@@ -84,5 +88,56 @@ func TestValidateRejectsInvalidColor(t *testing.T) {
 	cfg.KeyAssignments[0].Color = "#12"
 	if err := Validate(cfg); err == nil {
 		t.Fatal("expected validation error for invalid color")
+	}
+}
+
+func TestNewStoreUsesHpadConfigDir(t *testing.T) {
+	homeDir := t.TempDir()
+	t.Setenv("HOME", homeDir)
+	t.Setenv("XDG_CONFIG_HOME", "")
+	t.Setenv("XDG_STATE_HOME", "")
+	t.Setenv("XDG_RUNTIME_DIR", "")
+
+	store, err := NewStore()
+	if err != nil {
+		t.Fatalf("NewStore() error = %v", err)
+	}
+
+	if want := filepath.Join(homeDir, ".config", "hpad", "config.json"); store.Path() != want {
+		t.Fatalf("Path() = %q, want %q", store.Path(), want)
+	}
+}
+
+func TestLoadMigratesLegacyConfigOnFirstRead(t *testing.T) {
+	homeDir := t.TempDir()
+	t.Setenv("HOME", homeDir)
+	t.Setenv("XDG_CONFIG_HOME", "")
+	t.Setenv("XDG_STATE_HOME", "")
+	t.Setenv("XDG_RUNTIME_DIR", "")
+
+	legacyPath := filepath.Join(homeDir, ".config", "hpad-agent", "config.json")
+	if err := os.MkdirAll(filepath.Dir(legacyPath), 0o700); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	legacyConfig := Default()
+	legacyConfig.Profile = "Migrated"
+	if err := os.WriteFile(legacyPath, []byte("{\n  \"profile\": \"Migrated\",\n  \"keyAssignments\": [\n    {\n      \"id\": \"K1\",\n      \"label\": \"K1\",\n      \"color\": \"#000000\",\n      \"action\": {\n        \"type\": \"unassigned\"\n      }\n    },\n    {\n      \"id\": \"K2\",\n      \"label\": \"K2\",\n      \"color\": \"#000000\",\n      \"action\": {\n        \"type\": \"unassigned\"\n      }\n    },\n    {\n      \"id\": \"K3\",\n      \"label\": \"K3\",\n      \"color\": \"#000000\",\n      \"action\": {\n        \"type\": \"unassigned\"\n      }\n    },\n    {\n      \"id\": \"K4\",\n      \"label\": \"K4\",\n      \"color\": \"#000000\",\n      \"action\": {\n        \"type\": \"unassigned\"\n      }\n    },\n    {\n      \"id\": \"K5\",\n      \"label\": \"K5\",\n      \"color\": \"#000000\",\n      \"action\": {\n        \"type\": \"unassigned\"\n      }\n    },\n    {\n      \"id\": \"K6\",\n      \"label\": \"K6\",\n      \"color\": \"#000000\",\n      \"action\": {\n        \"type\": \"unassigned\"\n      }\n    }\n  ]\n}\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	store, err := NewStore()
+	if err != nil {
+		t.Fatalf("NewStore() error = %v", err)
+	}
+
+	cfg, err := store.Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.Profile != "Migrated" {
+		t.Fatalf("Profile = %q, want %q", cfg.Profile, "Migrated")
+	}
+	if _, err := os.Stat(store.Path()); err != nil {
+		t.Fatalf("expected migrated config at %q: %v", store.Path(), err)
 	}
 }
