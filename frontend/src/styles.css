@@ -161,7 +161,7 @@ select {
 
 .layout-panel {
   align-items: flex-start;
-  gap: 10px;
+  gap: 8px;
 }
 
 .section-header,
@@ -173,11 +173,10 @@ select {
 }
 
 .layout-header {
-  width: min(100%, 456px);
+  width: min(100%, 408px);
   margin-bottom: 0;
-  padding-bottom: 8px;
+  padding-bottom: 0;
   align-items: flex-end;
-  border-bottom: 1px solid rgba(148, 160, 177, 0.14);
 }
 
 .section-header h2,
@@ -210,130 +209,25 @@ select {
 }
 
 .layout-meta {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  flex-wrap: wrap;
   color: var(--text-muted);
-}
-
-.layout-meta span {
-  padding-left: 8px;
-  margin-left: 8px;
-  border-left: 1px solid var(--border);
-}
-
-.layout-meta span:first-child {
-  padding-left: 0;
-  margin-left: 0;
-  border-left: 0;
+  white-space: nowrap;
 }
 
 .layout-canvas {
-  width: min(100%, 456px);
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-start;
+  width: min(100%, 408px);
 }
 
 .device-shell {
-  position: relative;
   display: flex;
   width: 100%;
-  padding: 12px;
-  border: 1px solid #2d3540;
-  border-radius: 8px;
-  background: linear-gradient(180deg, #181e27 0%, #10161d 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), inset 0 0 0 1px rgba(255, 255, 255, 0.02);
-}
-
-.device-shell::before {
-  content: "";
-  position: absolute;
-  inset: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.025);
+  padding: 9px;
+  border: 1px solid var(--border);
   border-radius: 6px;
-  pointer-events: none;
+  background: #0f141b;
 }
 
-.device-faceplate {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  gap: 12px;
+.key-layout {
   width: 100%;
-}
-
-.device-rail {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 2px 4px 10px;
-  border-bottom: 1px solid rgba(148, 160, 177, 0.16);
-}
-
-.device-badge {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.device-name,
-.device-details {
-  font-family: "IBM Plex Mono", "Noto Sans Mono", monospace;
-  font-size: 11px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-.device-name {
-  color: var(--text);
-}
-
-.device-caption {
-  color: var(--text-muted);
-  font-size: 12px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.device-details {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  color: var(--text-muted);
-}
-
-.device-details span {
-  padding-left: 10px;
-  margin-left: 10px;
-  border-left: 1px solid rgba(148, 160, 177, 0.14);
-}
-
-.device-details span:first-child {
-  padding-left: 0;
-  margin-left: 0;
-  border-left: 0;
-}
-
-.device-plate {
-  position: relative;
-  padding: 18px;
-  border: 1px solid #313b47;
-  border-radius: 7px;
-  background: linear-gradient(180deg, #121820 0%, #0d1117 100%);
-}
-
-.device-plate-trim {
-  position: absolute;
-  inset: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.03);
-  border-radius: 5px;
-  pointer-events: none;
 }
 
 .status-card {
@@ -357,122 +251,94 @@ select {
 }
 
 .key-grid {
-  position: relative;
   display: grid;
-  grid-template-columns: repeat(3, 118px);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 7px;
-  justify-content: flex-start;
+  width: 100%;
 }
 
 .key-card {
-  position: relative;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
   width: 100%;
-  min-height: 80px;
-  padding: 10px 10px 9px;
-  border: 1px solid #394351;
-  border-radius: 4px;
-  background: linear-gradient(180deg, #141a22 0%, #0f151c 100%);
+  min-height: 76px;
+  padding: 10px 11px;
+  border: 1px solid #353f4b;
+  border-radius: 5px;
+  background: #111820;
   color: inherit;
   text-align: left;
   cursor: pointer;
   transition: border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
-  overflow: hidden;
-}
-
-.key-card::before {
-  content: "";
-  position: absolute;
-  inset: 4px;
-  border: 1px solid rgba(255, 255, 255, 0.04);
-  border-radius: 3px;
-  pointer-events: none;
 }
 
 .key-card:hover {
-  border-color: #495466;
-  background: linear-gradient(180deg, #171e26 0%, #111821 100%);
+  border-color: #475260;
+  background: #141b23;
 }
 
 .key-card:focus-visible {
   outline: none;
   border-color: var(--accent);
-  box-shadow: inset 0 0 0 1px rgba(90, 160, 255, 0.42);
+  box-shadow: inset 0 0 0 1px rgba(90, 160, 255, 0.22);
 }
 
 .key-card.assigned {
-  border-color: #44505e;
+  border-color: #414c58;
+  background: #121a22;
 }
 
 .key-card.selected {
   border-color: var(--accent);
-  background: linear-gradient(180deg, #18202a 0%, #111820 100%);
-  box-shadow: inset 0 0 0 1px rgba(90, 160, 255, 0.3);
-}
-
-.key-card.selected::before {
-  border-color: rgba(90, 160, 255, 0.32);
-}
-
-.key-card.selected::after {
-  content: "";
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 10px;
-  height: 10px;
-  border-top: 2px solid var(--accent);
-  border-right: 2px solid var(--accent);
-  opacity: 0.9;
-  pointer-events: none;
+  background: #131c25;
+  box-shadow: inset 0 0 0 1px rgba(90, 160, 255, 0.2);
 }
 
 .key-card.empty {
-  background: linear-gradient(180deg, #11161d 0%, #0d1218 100%);
+  background: #10161d;
 }
 
 .key-card.empty .key-summary {
-  color: #7e8896;
+  color: #7d8896;
 }
 
 .key-card.empty .key-label {
-  color: #c4ccd8;
+  color: #c6cfda;
 }
 
 .key-card-header {
   display: flex;
-  align-items: flex-start;
-  gap: 8px;
+  align-items: center;
+  gap: 7px;
   width: 100%;
   min-width: 0;
 }
 
 .key-indicator {
-  width: 8px;
-  height: 8px;
-  margin-top: 3px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  width: 7px;
+  height: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 2px;
   background: var(--key-led-color, #000000);
-  opacity: calc(0.22 + (0.68 * var(--key-led-opacity, 1)));
+  opacity: calc(0.18 + (0.72 * var(--key-led-opacity, 1)));
   flex: none;
 }
 
 .key-card.empty .key-indicator {
-  background: rgba(148, 160, 177, 0.18);
+  border-color: rgba(148, 160, 177, 0.16);
+  background: rgba(148, 160, 177, 0.2);
   opacity: 1;
 }
 
 .key-label {
   font-family: "IBM Plex Mono", "Noto Sans Mono", monospace;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   line-height: 1;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
 }
 
 .color-picker-copy strong,
@@ -484,9 +350,9 @@ select {
 .key-summary {
   margin: 0;
   min-width: 0;
-  font-size: 11.5px;
+  font-size: 11px;
   line-height: 1.35;
-  color: #cfd7e2;
+  color: #c8d2de;
   overflow: hidden;
   text-overflow: ellipsis;
   display: -webkit-box;
@@ -827,11 +693,6 @@ select {
   .layout-canvas,
   .device-shell {
     width: 100%;
-  }
-
-  .device-rail {
-    flex-direction: column;
-    align-items: flex-start;
   }
 
   .key-grid {

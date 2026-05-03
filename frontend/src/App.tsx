@@ -222,14 +222,8 @@ export default function App() {
       <main className="workspace">
         <section className="panel section-panel layout-panel">
           <div className="section-header layout-header">
-            <div>
-              <h2>HPAD</h2>
-            </div>
-            <div className="layout-meta">
-              <span>{keyCount} keys</span>
-              <span>{assignedCount} assigned</span>
-              <span>Selected {selectedAssignment.label}</span>
-            </div>
+            <h2>HPAD</h2>
+            <div className="layout-meta">{keyCount} keys · {assignedCount} assigned · {selectedAssignment.label} selected</div>
           </div>
 
           <div className="layout-canvas">
