@@ -11,8 +11,8 @@ type KeyGridProps = {
 
 export function KeyGrid(props: KeyGridProps) {
   return (
-    <div className="key-layout" aria-label="HPAD key layout">
-      <div className="key-grid" role="grid">
+    <div className="pad-preview" aria-label="HPAD key preview">
+      <div className="pad-preview-grid" role="grid">
         {props.keyAssignments.map((assignment: KeyAssignment, index: number) => {
           const assigned = isAssigned(assignment);
           const summary = getActionSummary(assignment.action);
@@ -21,18 +21,15 @@ export function KeyGrid(props: KeyGridProps) {
             <button
               key={assignment.id || index}
               type="button"
-              className={`key-card ${index === props.selectedIndex ? "selected" : ""} ${assigned ? "assigned" : "empty"}`}
+              className={`pad-key ${index === props.selectedIndex ? "selected" : ""} ${assigned ? "assigned" : "empty"}`}
               onClick={() => props.onSelect(index)}
               aria-label={assigned ? `${assignment.label}. Assigned. ${summary}.` : `${assignment.label}. Unassigned.`}
               aria-pressed={index === props.selectedIndex}
               style={getColorStyle(getAssignmentColor(assignment), getAssignmentBrightness(assignment))}
               title={`${assignment.label}: ${summary}`}
             >
-              <div className="key-card-header">
-                <span className="key-indicator" aria-hidden="true" />
-                <span className="key-label">{assignment.label}</span>
-              </div>
-              <p className="key-summary">{summary}</p>
+              <span className="pad-key-label">{assignment.label}</span>
+              <span className="led-swatch pad-key-led" aria-hidden="true" />
             </button>
           );
         })}

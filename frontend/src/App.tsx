@@ -10,6 +10,7 @@ import { DashboardState } from "../bindings/hpad-app/internal/app/models.js";
 import { KeyAction, KeyAssignment } from "../bindings/hpad-app/internal/config/models.js";
 
 import { KeyInspector } from "./components/KeyInspector";
+import { KeyAssignmentList } from "./components/KeyAssignmentList";
 import { KeyGrid } from "./components/KeyGrid";
 import { StatusChip } from "./components/StatusCard";
 import {
@@ -226,10 +227,16 @@ export default function App() {
             <div className="layout-meta">{keyCount} keys · {assignedCount} assigned · {selectedAssignment.label} selected</div>
           </div>
 
-          <div className="layout-canvas">
+          <div className="layout-stack">
             <div className="device-shell">
               <KeyGrid keyAssignments={dashboard.keyAssignments} selectedIndex={selectedIndex} onSelect={handleSelectKey} />
             </div>
+
+            <KeyAssignmentList
+              keyAssignments={dashboard.keyAssignments}
+              selectedIndex={selectedIndex}
+              onSelect={handleSelectKey}
+            />
           </div>
         </section>
 
