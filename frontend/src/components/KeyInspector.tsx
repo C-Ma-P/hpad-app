@@ -60,71 +60,80 @@ export function KeyInspector(props: KeyInspectorProps) {
 
       <section className="inspector-section">
         <p className="inspector-section-title">Action</p>
-        <div className="field-stack">
-          <label className="field">
-            <span>Action Type</span>
-            <select
-              value={props.draftAction.type || ACTION_UNASSIGNED}
-              onChange={(event) => props.onActionTypeChange(event.target.value)}
-            >
-              {actionOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
+        <div className="property-grid">
+          <div className="property-row">
+            <label className="property-label" htmlFor="inspector-action-type">
+              Action Type
+            </label>
+            <div className="property-control">
+              <select
+                id="inspector-action-type"
+                value={props.draftAction.type || ACTION_UNASSIGNED}
+                onChange={(event) => props.onActionTypeChange(event.target.value)}
+              >
+                {actionOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
 
           {renderActionFields(props.draftAction, props.onDraftFieldChange)}
 
           {showDeferredWiringNote(props.draftAction.type) ? (
-            <p className="field-note">This action is stored now and can be wired to device execution later.</p>
+            <div className="property-row property-row-note">
+              <span className="property-label">Note</span>
+              <p className="field-note">This action is stored now and can be wired to device execution later.</p>
+            </div>
           ) : null}
         </div>
       </section>
 
       <section className="inspector-section">
         <p className="inspector-section-title">Lighting</p>
-        <div className="field-stack">
-          <div className="field-grid">
-            <label className="field">
-              <span>LED Color</span>
-              <div className="color-picker-shell">
-                <input
-                  className="color-picker-input"
-                  type="color"
-                  value={props.draftColor}
-                  onChange={(event) => props.onColorPickerChange(event.target.value)}
-                />
-                <div className="color-picker-copy">
-                  <strong>{props.draftColor}</strong>
-                  <p className="field-note">Uses the native platform color picker.</p>
-                </div>
-              </div>
+        <div className="property-grid">
+          <div className="property-row">
+            <label className="property-label" htmlFor="inspector-led-color">
+              Color
             </label>
-
-            <label className="field">
-              <span>Hex Code</span>
-              <div className="hex-input-row">
-                <input
-                  type="text"
-                  value={props.draftColorInput}
-                  onChange={(event) => props.onColorInputChange(event.target.value)}
-                  onBlur={props.onColorInputBlur}
-                  placeholder="#FF6B00"
-                  maxLength={7}
-                />
-                <button type="button" className="button button-secondary" onClick={props.onResetColor} disabled={props.busy}>
-                  Off
-                </button>
-              </div>
-            </label>
+            <div className="property-control color-row">
+              <input
+                id="inspector-led-color"
+                className="color-picker-input inspector-color-input"
+                type="color"
+                value={props.draftColor}
+                onChange={(event) => props.onColorPickerChange(event.target.value)}
+              />
+              <input
+                id="inspector-led-hex"
+                className="control-short"
+                type="text"
+                value={props.draftColorInput}
+                onChange={(event) => props.onColorInputChange(event.target.value)}
+                onBlur={props.onColorInputBlur}
+                placeholder="#FF6B00"
+                maxLength={7}
+              />
+              <button
+                type="button"
+                className="button button-secondary button-compact"
+                onClick={props.onResetColor}
+                disabled={props.busy}
+              >
+                Off
+              </button>
+            </div>
           </div>
 
-          <label className="field">
-            <span>Brightness</span>
-            <div className="brightness-row">
+          <div className="property-row">
+            <label className="property-label" htmlFor="inspector-brightness">
+              Brightness
+            </label>
+            <div className="property-control brightness-row">
               <input
+                id="inspector-brightness"
                 className="brightness-slider"
                 type="range"
                 min={0}
@@ -135,20 +144,24 @@ export function KeyInspector(props: KeyInspectorProps) {
               />
               <div className="brightness-value">{formatBrightnessPercent(props.draftBrightness)}</div>
             </div>
-            <p className="field-note">0% turns the LED off. 100% sends the stored color at full brightness.</p>
-          </label>
+          </div>
         </div>
       </section>
 
       <section className="inspector-section">
         <p className="inspector-section-title">Preview</p>
-        <div className="inspector-preview-row" style={getColorStyle(props.draftColor, props.draftBrightness)}>
-          <span className="key-led-preview inspector-led-swatch" aria-hidden="true" />
-          <div className="inspector-preview-copy">
-            <strong>{props.draftColor}</strong>
-            <p>
-              {formatBrightnessPercent(props.draftBrightness)} brightness · {getActionSummary(props.draftAction)}
-            </p>
+        <div className="property-grid">
+          <div className="property-row">
+            <span className="property-label">Current</span>
+            <div className="inspector-preview-row" style={getColorStyle(props.draftColor, props.draftBrightness)}>
+              <span className="key-led-preview inspector-led-swatch" aria-hidden="true" />
+              <div className="inspector-preview-copy">
+                <strong>{props.draftColor}</strong>
+                <p>
+                  {formatBrightnessPercent(props.draftBrightness)} brightness · {getActionSummary(props.draftAction)}
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -175,68 +188,100 @@ function renderActionFields(
   switch (action.type || ACTION_UNASSIGNED) {
     case ACTION_KEYBOARD_SHORTCUT:
       return (
-        <label className="field">
-          <span>Shortcut</span>
-          <input
-            type="text"
-            value={action.shortcut ?? ""}
-            onChange={(event) => onChange("shortcut", event.target.value)}
-            placeholder="Ctrl+Shift+P"
-          />
-        </label>
+        <div className="property-row">
+          <label className="property-label" htmlFor="inspector-shortcut">
+            Shortcut
+          </label>
+          <div className="property-control">
+            <input
+              id="inspector-shortcut"
+              className="control-medium"
+              type="text"
+              value={action.shortcut ?? ""}
+              onChange={(event) => onChange("shortcut", event.target.value)}
+              placeholder="Ctrl+Shift+P"
+            />
+          </div>
+        </div>
       );
     case ACTION_RUN_COMMAND:
       return (
         <>
-          <label className="field">
-            <span>Command</span>
-            <input
-              type="text"
-              value={action.command ?? ""}
-              onChange={(event) => onChange("command", event.target.value)}
-              placeholder="/usr/bin/playerctl"
-            />
-          </label>
-          <label className="field">
-            <span>Arguments</span>
-            <input
-              type="text"
-              value={action.arguments ?? ""}
-              onChange={(event) => onChange("arguments", event.target.value)}
-              placeholder="play-pause"
-            />
-          </label>
+          <div className="property-row">
+            <label className="property-label" htmlFor="inspector-command">
+              Command
+            </label>
+            <div className="property-control">
+              <input
+                id="inspector-command"
+                type="text"
+                value={action.command ?? ""}
+                onChange={(event) => onChange("command", event.target.value)}
+                placeholder="/usr/bin/playerctl"
+              />
+            </div>
+          </div>
+          <div className="property-row">
+            <label className="property-label" htmlFor="inspector-arguments">
+              Arguments
+            </label>
+            <div className="property-control">
+              <input
+                id="inspector-arguments"
+                type="text"
+                value={action.arguments ?? ""}
+                onChange={(event) => onChange("arguments", event.target.value)}
+                placeholder="play-pause"
+              />
+            </div>
+          </div>
         </>
       );
     case ACTION_OPEN_APPLICATION:
       return (
-        <label className="field">
-          <span>Application</span>
-          <input
-            type="text"
-            value={action.application ?? ""}
-            onChange={(event) => onChange("application", event.target.value)}
-            placeholder="/usr/bin/code"
-          />
-        </label>
+        <div className="property-row">
+          <label className="property-label" htmlFor="inspector-application">
+            Application
+          </label>
+          <div className="property-control">
+            <input
+              id="inspector-application"
+              type="text"
+              value={action.application ?? ""}
+              onChange={(event) => onChange("application", event.target.value)}
+              placeholder="/usr/bin/code"
+            />
+          </div>
+        </div>
       );
     case ACTION_MEDIA_CONTROL:
       return (
-        <label className="field">
-          <span>Media Control</span>
-          <select
-            value={action.mediaControl ?? mediaOptions[0].value}
-            onChange={(event) => onChange("mediaControl", event.target.value)}
-          >
-            {mediaOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="property-row">
+          <label className="property-label" htmlFor="inspector-media-control">
+            Media
+          </label>
+          <div className="property-control">
+            <select
+              id="inspector-media-control"
+              className="control-medium"
+              value={action.mediaControl ?? mediaOptions[0].value}
+              onChange={(event) => onChange("mediaControl", event.target.value)}
+            >
+              {mediaOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
       );
     default:
-      return <p className="field-note">No action is assigned to this key.</p>;
+      return (
+        <div className="property-row property-row-note">
+          <span className="property-label">State</span>
+          <p className="field-note">No action is assigned to this key.</p>
+        </div>
+      );
   }
 }

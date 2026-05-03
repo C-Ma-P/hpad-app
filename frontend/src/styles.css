@@ -84,6 +84,7 @@ select {
 .footer-state,
 .inspector-section-title,
 .field span,
+.property-label,
 .layout-meta,
 .assignment-header {
   font-family: "IBM Plex Mono", "Noto Sans Mono", monospace;
@@ -118,6 +119,7 @@ select {
 .status-chip-title,
 .section-kicker,
 .field span,
+.property-label,
 .inspector-section-title,
 .assignment-header {
   color: var(--text-muted);
@@ -181,6 +183,12 @@ select {
   margin: 2px 0 0;
   font-size: 18px;
   font-weight: 600;
+
+.inspector-header .selection-badge {
+  min-height: 24px;
+  padding: 0 6px;
+  gap: 6px;
+}
   letter-spacing: 0.01em;
 }
 
@@ -458,6 +466,79 @@ button.assignment-row:focus-visible {
   gap: 5px;
 }
 
+.property-grid {
+  display: grid;
+  gap: 6px;
+}
+
+.property-row {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  align-items: center;
+  column-gap: 8px;
+  min-height: 28px;
+}
+
+.property-row-note {
+  align-items: start;
+}
+
+.property-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.property-control input,
+.property-control select {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 1px;
+  background: var(--field);
+  color: var(--text);
+  outline: none;
+}
+
+.property-control input:focus,
+.property-control select:focus {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent-soft);
+}
+
+.property-control input[type="range"] {
+  height: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.control-medium {
+  flex: 0 1 208px !important;
+  width: min(208px, 100%);
+}
+
+.control-short {
+  flex: 0 0 92px !important;
+  width: 92px;
+}
+
+.color-row {
+  display: grid;
+  grid-template-columns: 30px 92px auto;
+  align-items: center;
+  justify-content: start;
+  gap: 6px;
+}
+
+.button-compact {
+  height: 28px;
+  padding: 0 8px;
+}
+
 .field input,
 .field select {
   width: 100%;
@@ -481,6 +562,10 @@ button.assignment-row:focus-visible {
   padding: 0;
 }
 
+.property-row .field-note {
+  margin: 0;
+}
+
 .color-picker-shell {
   display: flex;
   align-items: center;
@@ -501,6 +586,12 @@ button.assignment-row:focus-visible {
   border-radius: 0;
   background: transparent;
   cursor: pointer;
+}
+
+.inspector-color-input {
+  width: 30px;
+  min-width: 30px;
+  height: 20px;
 }
 
 .color-picker-input::-webkit-color-swatch-wrapper {
@@ -527,7 +618,7 @@ button.assignment-row:focus-visible {
 
 .brightness-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 64px;
+  grid-template-columns: minmax(0, 1fr) 60px;
   gap: 8px;
   align-items: center;
 }
@@ -543,7 +634,7 @@ button.assignment-row:focus-visible {
   align-items: center;
   justify-content: center;
   height: 28px;
-  padding: 0 8px;
+  padding: 0 6px;
   border: 1px solid var(--border);
   border-radius: 1px;
   background: var(--field);
@@ -552,10 +643,13 @@ button.assignment-row:focus-visible {
 
 .inspector-preview-row {
   --key-led-color: #000000;
-  display: flex;
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr);
   align-items: center;
   gap: 8px;
-  padding: 7px 8px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 5px 6px;
   border: 1px solid var(--border);
   border-radius: 1px;
   background: var(--field);
@@ -573,6 +667,7 @@ button.assignment-row:focus-visible {
 .inspector-actions {
   display: flex;
   justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 6px;
   margin-top: auto;
   padding-top: 8px;
