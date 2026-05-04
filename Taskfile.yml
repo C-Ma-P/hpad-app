@@ -113,3 +113,32 @@ tasks:
   logs:
     cmds:
       - journalctl --user -u hpad.service -f
+
+  logs:devices:
+    desc: Monitor HPAD macropad and dongle serial logs
+    deps:
+      - task: build:hpad-log
+    interactive: true
+    cmds:
+      - sudo ./{{.BIN_DIR}}/hpad-log
+
+  logs:devices:list:
+    desc: List HPAD serial log devices
+    deps:
+      - task: build:hpad-log
+    cmds:
+      - ./{{.BIN_DIR}}/hpad-log --list
+
+  logs:devices:timestamps:
+    desc: Monitor HPAD serial logs with host timestamps
+    deps:
+      - task: build:hpad-log
+    interactive: true
+    cmds:
+      - sudo ./{{.BIN_DIR}}/hpad-log --timestamps
+
+  build:hpad-log:
+    desc: Build HPAD serial log monitor
+    cmds:
+      - mkdir -p {{.BIN_DIR}}
+      - go build -trimpath -buildvcs=false -o {{.BIN_DIR}}/hpad-log ./cmd/hpad-log
