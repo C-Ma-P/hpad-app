@@ -6,6 +6,13 @@ vars:
   VITE_PORT: '{{.WAILS_VITE_PORT | default 9245}}'
 
 tasks:
+  git:push:
+    deps:
+      - task: go:mod:tidy
+      - task: install-user
+    cmds:
+      - git add . && git commit -m "Update" && git push
+  
   go:mod:tidy:
     internal: true
     cmds:

@@ -10,20 +10,21 @@ import { DashboardState } from "../bindings/hpad-app/internal/app/models.js";
 import { KeyAction, KeyAssignment } from "../bindings/hpad-app/internal/config/models.js";
 
 import { KeyInspector } from "./components/KeyInspector";
-import { KeyAssignmentList } from "./components/KeyAssignmentList";
 import { KeyGrid } from "./components/KeyGrid";
 import { StatusChip } from "./components/StatusCard";
 import {
   copyAction,
   createEmptyAction,
-  isAssigned,
+  getActionSummary,
   normalizeAction,
 } from "./domain/action";
 import {
   DEFAULT_KEY_BRIGHTNESS,
   DEFAULT_KEY_COLOR,
+  formatBrightnessPercent,
   getAssignmentBrightness,
   getAssignmentColor,
+  getColorStyle,
   isValidColor,
   normalizeBrightness,
   normalizeColor,
@@ -92,8 +93,11 @@ export default function App() {
   }, [draftDirty, selectedIndex]);
 
   const selectedAssignment = dashboard.keyAssignments[selectedIndex] ?? createDefaultAssignment(selectedIndex);
-  const keyCount = dashboard.keyAssignments.length || 6;
-  const assignedCount = dashboard.keyAssignments.filter(isAssigned).length;
+  const selectedStoredSummary = getActionSummary(selectedAssignment.action);
+  const selectedLedColor = getAssignmentColor(selectedAssignment);
+  const selectedLedBrightness = getAssignmentBrightness(selectedAssignment);
+  const selectedLedStyle = getColorStyle(selectedLedColor, selectedLedBrightness);
+  const selectedLedBrightnessLabel = formatBrightnessPercent(selectedLedBrightness);
   const configStateLabel = dashboard.dirty ? "Dirty" : "Saved";
   const saveButtonLabel = busy ? "Saving..." : "Save to Device";
 
@@ -204,10 +208,6 @@ export default function App() {
       <header className="topbar panel">
         <div className="toolbar-brand">
           <span className="app-title">HPAD</span>
-          <div className="toolbar-profile">
-            <span className="toolbar-label">Profile</span>
-            <strong>{dashboard.profile}</strong>
-          </div>
         </div>
         <div className="toolbar-strip">
           <StatusChip title="Dongle" status={dashboard.dongleStatus.label} tone={dashboard.dongleStatus.state} />
@@ -223,20 +223,32 @@ export default function App() {
       <main className="workspace">
         <section className="panel section-panel layout-panel">
           <div className="section-header layout-header">
-            <h2>HPAD</h2>
-            <div className="layout-meta">{keyCount} keys · {assignedCount} assigned · {selectedAssignment.label} selected</div>
+            <h2>Selected {selectedAssignment.label}</h2>
           </div>
 
           <div className="layout-stack">
             <div className="device-shell">
-              <KeyGrid keyAssignments={dashboard.keyAssignments} selectedIndex={selectedIndex} onSelect={handleSelectKey} />
-            </div>
+              <div className="device-preview">
+                <div className="device-plate">
+                  <KeyGrid keyAssignments={dashboard.keyAssignments} selectedIndex={selectedIndex} onSelect={handleSelectKey} />
+                </div>
 
-            <KeyAssignmentList
-              keyAssignments={dashboard.keyAssignments}
-              selectedIndex={selectedIndex}
-              onSelect={handleSelectKey}
-            />
+                <div className="device-summary-strip" aria-live="polite">
+                  <div className="device-summary-item">
+                    <span>Stored</span>
+                    <strong title={selectedStoredSummary}>{selectedStoredSummary}</strong>
+                  </div>
+                  <div className="device-summary-item">
+                    <span>LED</span>
+                    <div className="device-summary-value">
+                      <span className="led-swatch device-summary-swatch" aria-hidden="true" style={selectedLedStyle} />
+                      <strong>{selectedLedColor}</strong>
+                      <span className="device-summary-brightness">{selectedLedBrightnessLabel}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 

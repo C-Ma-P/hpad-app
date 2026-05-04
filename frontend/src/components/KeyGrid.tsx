@@ -28,8 +28,16 @@ export function KeyGrid(props: KeyGridProps) {
               style={getColorStyle(getAssignmentColor(assignment), getAssignmentBrightness(assignment))}
               title={`${assignment.label}: ${summary}`}
             >
-              <span className="pad-key-label">{assignment.label}</span>
-              <span className="led-swatch pad-key-led" aria-hidden="true" />
+              <span className="pad-key-header">
+                <span className="pad-key-label">{assignment.label}</span>
+                <span className="pad-key-state">{assigned ? "Assigned" : "Empty"}</span>
+              </span>
+              <span className="pad-key-footer">
+                <span className="pad-key-ledline">
+                  <span className="led-swatch pad-key-led" aria-hidden="true" />
+                  LED
+                </span>
+              </span>
             </button>
           );
         })}

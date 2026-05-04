@@ -68,6 +68,7 @@ export function KeyInspector(props: KeyInspectorProps) {
             <div className="property-control">
               <select
                 id="inspector-action-type"
+                className="control-medium"
                 value={props.draftAction.type || ACTION_UNASSIGNED}
                 onChange={(event) => props.onActionTypeChange(event.target.value)}
               >
@@ -195,7 +196,7 @@ function renderActionFields(
           <div className="property-control">
             <input
               id="inspector-shortcut"
-              className="control-medium"
+              className="control-wide"
               type="text"
               value={action.shortcut ?? ""}
               onChange={(event) => onChange("shortcut", event.target.value)}
@@ -214,6 +215,7 @@ function renderActionFields(
             <div className="property-control">
               <input
                 id="inspector-command"
+                className="control-command"
                 type="text"
                 value={action.command ?? ""}
                 onChange={(event) => onChange("command", event.target.value)}
@@ -228,6 +230,7 @@ function renderActionFields(
             <div className="property-control">
               <input
                 id="inspector-arguments"
+                className="control-command"
                 type="text"
                 value={action.arguments ?? ""}
                 onChange={(event) => onChange("arguments", event.target.value)}
@@ -246,6 +249,7 @@ function renderActionFields(
           <div className="property-control">
             <input
               id="inspector-application"
+              className="control-wide"
               type="text"
               value={action.application ?? ""}
               onChange={(event) => onChange("application", event.target.value)}
