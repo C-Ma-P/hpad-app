@@ -31,32 +31,24 @@ type KeyInspectorProps = {
   onBrightnessChange: (value: number) => void;
   onClear: () => void;
   onRevert: () => void;
-  onApply: () => void;
 };
 
 export function KeyInspector(props: KeyInspectorProps) {
   const assignmentState = isAssigned(props.assignment) ? "Assigned" : "Unassigned";
 
   return (
-    <aside className="panel inspector-panel" aria-labelledby="key-inspector-title">
+    <section className="panel inspector-panel" aria-labelledby="key-inspector-title">
       <div className="inspector-header">
         <div>
-          <p className="section-kicker">Inspector</p>
+          <p className="section-kicker">Editor</p>
           <h2 id="key-inspector-title">{props.assignment.label}</h2>
         </div>
         <span className={`selection-badge ${isAssigned(props.assignment) ? "is-assigned" : ""}`}>{assignmentState}</span>
       </div>
 
-      <div className="inspector-meta">
-        <div className="inspector-meta-row">
-          <span>Stored</span>
-          <strong>{getActionSummary(props.assignment.action)}</strong>
-        </div>
-        <div className="inspector-meta-row">
-          <span>Draft</span>
-          <strong>{props.draftDirty ? "Pending changes" : "Matches stored state"}</strong>
-        </div>
-      </div>
+      <p className="inspector-status-line">
+        {props.draftDirty ? "Draft has unapplied changes." : "Editing the stored action for this key."}
+      </p>
 
       <section className="inspector-section">
         <p className="inspector-section-title">Action</p>
@@ -155,7 +147,7 @@ export function KeyInspector(props: KeyInspectorProps) {
           <div className="property-row">
             <span className="property-label">Current</span>
             <div className="inspector-preview-row" style={getColorStyle(props.draftColor, props.draftBrightness)}>
-              <span className="key-led-preview inspector-led-swatch" aria-hidden="true" />
+              <span className="inspector-led-swatch" aria-hidden="true" />
               <div className="inspector-preview-copy">
                 <strong>{props.draftColor}</strong>
                 <p>
@@ -168,17 +160,14 @@ export function KeyInspector(props: KeyInspectorProps) {
       </section>
 
       <div className="inspector-actions">
-        <button type="button" className="button button-secondary" onClick={props.onClear} disabled={props.busy}>
-          Clear Action
-        </button>
         <button type="button" className="button button-secondary" onClick={props.onRevert} disabled={props.busy || !props.draftDirty}>
           Revert
         </button>
-        <button type="button" className="button button-primary" onClick={props.onApply} disabled={props.busy || !props.draftDirty}>
-          Apply
+        <button type="button" className="button button-secondary" onClick={props.onClear} disabled={props.busy}>
+          Clear Action
         </button>
       </div>
-    </aside>
+    </section>
   );
 }
 

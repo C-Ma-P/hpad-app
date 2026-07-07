@@ -97,10 +97,10 @@ func Run() error {
 
 	window := app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:            "HPAD",
-		Width:            1280,
-		Height:           820,
-		MinWidth:         1120,
-		MinHeight:        720,
+		Width:            424,
+		Height:           860,
+		MinWidth:         392,
+		MinHeight:        760,
 		BackgroundColour: application.NewRGB(16, 18, 23),
 		URL:              "/",
 		Hidden:           true,

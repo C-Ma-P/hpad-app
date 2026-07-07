@@ -42,7 +42,7 @@ export default function App() {
   const [draftBrightness, setDraftBrightness] = useState(DEFAULT_KEY_BRIGHTNESS);
   const [draftDirty, setDraftDirty] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
+  const [busyAction, setBusyAction] = useState<"apply" | "clear" | "save" | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const hydrateDraft = (assignment?: KeyAssignment) => {
@@ -98,8 +98,19 @@ export default function App() {
   const selectedLedBrightness = getAssignmentBrightness(selectedAssignment);
   const selectedLedStyle = getColorStyle(selectedLedColor, selectedLedBrightness);
   const selectedLedBrightnessLabel = formatBrightnessPercent(selectedLedBrightness);
+  const busy = busyAction !== null;
   const configStateLabel = dashboard.dirty ? "Dirty" : "Saved";
-  const saveButtonLabel = busy ? "Saving..." : "Save to Device";
+  const footerStateLabel = errorMessage ? "Error" : configStateLabel;
+  const footerStateClass = errorMessage ? "error" : dashboard.dirty ? "dirty" : "saved";
+  const applyButtonLabel = busyAction === "apply" ? "Applying..." : "Apply";
+  const saveButtonLabel = busyAction === "save" ? "Saving..." : "Save to Device";
+  const footerStatusText = errorMessage
+    ? errorMessage
+    : draftDirty
+      ? `${selectedAssignment.label} has unapplied editor changes.`
+      : dashboard.dirty
+        ? "Changes are staged locally and pending save to device."
+        : "Configuration synced to device.";
 
   const handleSelectKey = (index: number) => {
     setSelectedIndex(index);
@@ -158,7 +169,7 @@ export default function App() {
   };
 
   const handleApply = async () => {
-    setBusy(true);
+    setBusyAction("apply");
     try {
       const next = await ApplyKeySettings(
         selectedIndex,
@@ -172,12 +183,12 @@ export default function App() {
     } catch (error) {
       setErrorMessage(getErrorMessage(error));
     } finally {
-      setBusy(false);
+      setBusyAction(null);
     }
   };
 
   const handleClear = async () => {
-    setBusy(true);
+    setBusyAction("clear");
     try {
       const next = await ClearKeyAction(selectedIndex);
       setDashboard(next);
@@ -186,12 +197,12 @@ export default function App() {
     } catch (error) {
       setErrorMessage(getErrorMessage(error));
     } finally {
-      setBusy(false);
+      setBusyAction(null);
     }
   };
 
   const handleSave = async () => {
-    setBusy(true);
+    setBusyAction("save");
     try {
       const next = await SaveToDevice();
       setDashboard(next);
@@ -199,55 +210,49 @@ export default function App() {
     } catch (error) {
       setErrorMessage(getErrorMessage(error));
     } finally {
-      setBusy(false);
+      setBusyAction(null);
     }
   };
 
   return (
     <div className="app-shell">
-      <header className="topbar panel">
-        <div className="toolbar-brand">
+      <header className="status-strip panel">
+        <div className="status-strip-title">
           <span className="app-title">HPAD</span>
         </div>
-        <div className="toolbar-strip">
+        <div className="status-strip-chips">
           <StatusChip title="Dongle" status={dashboard.dongleStatus.label} tone={dashboard.dongleStatus.state} />
-          <StatusChip title="Macropad" status={dashboard.macropadStatus.label} tone={dashboard.macropadStatus.state} />
-          <StatusChip title="Power" status={getBatteryChipStatus(dashboard.batteryStatus)} tone={dashboard.batteryStatus.state} />
-          <div className={`toolbar-state ${dashboard.dirty ? "dirty" : "saved"}`}>
-            <span className="toolbar-label">Config</span>
-            <strong>{configStateLabel}</strong>
-          </div>
+          <StatusChip title="Pad" status={dashboard.macropadStatus.label} tone={dashboard.macropadStatus.state} />
+          <StatusChip title="Battery" status={getBatteryChipStatus(dashboard.batteryStatus)} tone={dashboard.batteryStatus.state} />
+          <StatusChip title="Config" status={configStateLabel} tone={dashboard.dirty ? "waiting" : "connected"} />
         </div>
       </header>
 
-      <main className="workspace">
-        <section className="panel section-panel layout-panel">
-          <div className="section-header layout-header">
-            <h2>Selected {selectedAssignment.label}</h2>
+      <main className="utility-main">
+        <section className="panel matrix-panel">
+          <div className="matrix-panel-header">
+            <p className="section-kicker">Key Matrix</p>
+            <p className="matrix-panel-note">Select a key to edit its stored action and LED.</p>
           </div>
 
-          <div className="layout-stack">
-            <div className="device-shell">
-              <div className="device-preview">
-                <div className="device-plate">
-                  <KeyGrid keyAssignments={dashboard.keyAssignments} selectedIndex={selectedIndex} onSelect={handleSelectKey} />
-                </div>
+          <KeyGrid keyAssignments={dashboard.keyAssignments} selectedIndex={selectedIndex} onSelect={handleSelectKey} />
+        </section>
 
-                <div className="device-summary-strip" aria-live="polite">
-                  <div className="device-summary-item">
-                    <span>Stored</span>
-                    <strong title={selectedStoredSummary}>{selectedStoredSummary}</strong>
-                  </div>
-                  <div className="device-summary-item">
-                    <span>LED</span>
-                    <div className="device-summary-value">
-                      <span className="led-swatch device-summary-swatch" aria-hidden="true" style={selectedLedStyle} />
-                      <strong>{selectedLedColor}</strong>
-                      <span className="device-summary-brightness">{selectedLedBrightnessLabel}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
+        <section className="panel key-summary-strip" aria-live="polite">
+          <div className="key-summary-item">
+            <span className="summary-label">Selected</span>
+            <strong>{selectedAssignment.label}</strong>
+          </div>
+          <div className="key-summary-item key-summary-item-wide">
+            <span className="summary-label">Stored</span>
+            <strong title={selectedStoredSummary}>{selectedStoredSummary}</strong>
+          </div>
+          <div className="key-summary-item">
+            <span className="summary-label">LED</span>
+            <div className="key-summary-value">
+              <span className="led-swatch key-summary-swatch" aria-hidden="true" style={selectedLedStyle} />
+              <strong>{selectedLedColor}</strong>
+              <span className="summary-inline-note">{selectedLedBrightnessLabel}</span>
             </div>
           </div>
         </section>
@@ -269,27 +274,22 @@ export default function App() {
           onBrightnessChange={handleBrightnessChange}
           onClear={handleClear}
           onRevert={handleRevert}
-          onApply={handleApply}
         />
       </main>
 
       <footer className="footerbar panel">
         <div className="footer-status-line">
-          <span className={`footer-state ${dashboard.dirty ? "dirty" : "saved"}`}>{configStateLabel}</span>
-          <span className="footer-copy">
-            {dashboard.dirty ? "Changes pending save to device." : "Configuration synced to device."}
-          </span>
-          {errorMessage ? (
-            <span className="footer-error">{errorMessage}</span>
-          ) : (
-            <span className="footer-hint">
-              {draftDirty ? `${selectedAssignment.label} has unapplied inspector changes.` : "No recent errors."}
-            </span>
-          )}
+          <span className={`footer-state ${footerStateClass}`}>{footerStateLabel}</span>
+          <span className={errorMessage ? "footer-error" : "footer-copy"}>{footerStatusText}</span>
         </div>
-        <button type="button" className="button button-primary footer-button" onClick={handleSave} disabled={busy || !dashboard.dirty}>
-          {saveButtonLabel}
-        </button>
+        <div className="footer-actions">
+          <button type="button" className="button button-secondary" onClick={handleApply} disabled={busy || !draftDirty}>
+            {applyButtonLabel}
+          </button>
+          <button type="button" className="button button-primary footer-button" onClick={handleSave} disabled={busy || !dashboard.dirty}>
+            {saveButtonLabel}
+          </button>
+        </div>
       </footer>
 
       {loading ? <div className="loading-mask">Loading HPAD state...</div> : null}
