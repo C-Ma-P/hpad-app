@@ -16,6 +16,42 @@ func encodeKeyLEDConfigReport(settings KeyLEDSettings) [usbVendorOutputTransferS
 	return report
 }
 
+func encodeKeyLEDConfigPayload(settings KeyLEDSettings) [desktopBLEConfigSize]byte {
+	var payload [desktopBLEConfigSize]byte
+	offset := 1
+
+	payload[0] = configKindKeyColors
+	for _, setting := range settings {
+		copy(payload[offset:offset+len(setting.Color)], setting.Color[:])
+		offset += len(setting.Color)
+		payload[offset] = setting.Brightness
+		offset++
+	}
+
+	return payload
+}
+
+func decodeDesktopBLEProtocol(raw []byte) bool {
+	return len(raw) >= desktopBLEProtocolSize &&
+		raw[0] == desktopBLEProtocolVersion &&
+		raw[1]&desktopBLECapabilityLEDConfig != 0
+}
+
+func decodeDesktopBLEInputReport(raw []byte) (Report, bool) {
+	if len(raw) != desktopBLEInputReportSize {
+		return Report{}, false
+	}
+
+	return Report{
+		Connected:       true,
+		Keys:            raw[0],
+		EncoderDelta:    int8(raw[1]),
+		EncoderPressed:  raw[2] != 0,
+		BatteryMV:       uint16(raw[3]) | (uint16(raw[4]) << 8),
+		USBPowerPresent: raw[5] != 0,
+	}, true
+}
+
 func decodeVendorInputReport(raw []byte) (Report, bool) {
 	payload := raw
 	switch {

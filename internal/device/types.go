@@ -17,6 +17,23 @@ const (
 	usbVendorOutputReportSize        = configReportSize
 	usbVendorInputTransferSize       = 1 + usbVendorInputReportSize
 	usbVendorOutputTransferSize      = 1 + usbVendorOutputReportSize
+
+	desktopBLEProtocolVersion     byte = 0x01
+	desktopBLECapabilityLEDConfig byte = 0x01
+	desktopBLEProtocolSize             = 2
+	desktopBLEInputReportSize          = macropadReportSize
+	desktopBLEConfigSize               = configReportSize
+	desktopBLEServiceUUID              = "6f7d7a10-5d57-4a0d-9f0d-484150440001"
+	desktopBLEProtocolUUID             = "6f7d7a11-5d57-4a0d-9f0d-484150440001"
+	desktopBLEInputUUID                = "6f7d7a12-5d57-4a0d-9f0d-484150440001"
+	desktopBLEConfigUUID               = "6f7d7a13-5d57-4a0d-9f0d-484150440001"
+)
+
+type Source string
+
+const (
+	SourceUSB Source = "usb"
+	SourceBLE Source = "ble"
 )
 
 type KeyLEDSetting struct {
@@ -27,6 +44,7 @@ type KeyLEDSetting struct {
 type KeyLEDSettings [protocolKeyCount]KeyLEDSetting
 
 type Info struct {
+	Source          Source `json:"source"`
 	Path            string `json:"path"`
 	VendorID        uint16 `json:"vendorID"`
 	ProductID       uint16 `json:"productID"`
@@ -36,6 +54,7 @@ type Info struct {
 }
 
 type Report struct {
+	Source          Source `json:"source,omitempty"`
 	Connected       bool   `json:"connected"`
 	Keys            uint8  `json:"keys"`
 	EncoderDelta    int8   `json:"encoderDelta"`
@@ -45,6 +64,7 @@ type Report struct {
 }
 
 type DisconnectInfo struct {
+	Source  Source `json:"source,omitempty"`
 	Reason  string `json:"reason"`
 	IsError bool   `json:"isError"`
 }

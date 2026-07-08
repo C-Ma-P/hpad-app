@@ -221,7 +221,7 @@ export default function App() {
           <span className="app-title">HPAD</span>
         </div>
         <div className="status-strip-chips">
-          <StatusChip title="Dongle" status={dashboard.dongleStatus.label} tone={dashboard.dongleStatus.state} />
+          <StatusChip title="USB Receiver" status={dashboard.dongleStatus.label} tone={dashboard.dongleStatus.state} />
           <StatusChip title="Pad" status={dashboard.macropadStatus.label} tone={dashboard.macropadStatus.state} />
           <StatusChip title="Battery" status={getBatteryChipStatus(dashboard.batteryStatus)} tone={dashboard.batteryStatus.state} />
           <StatusChip title="Config" status={configStateLabel} tone={dashboard.dirty ? "waiting" : "connected"} />
@@ -301,7 +301,7 @@ function createEmptyDashboardState() {
   return new DashboardState({
     profile: "Default",
     dongleStatus: { state: "not_detected", label: "Not Detected", detail: "USB HID dongle not detected" },
-    macropadStatus: { state: "unknown", label: "Unknown", detail: "Waiting for dongle" },
+    macropadStatus: { state: "unknown", label: "Unknown", detail: "Waiting for Desktop Dongle or Desktop BLE" },
     batteryStatus: { state: "waiting", label: "--.- V", detail: "Waiting for device report", batteryMV: 0, usbPowerPresent: false },
     keyAssignments: Array.from({ length: 6 }, (_, index) => createDefaultAssignment(index)),
     dirty: false,

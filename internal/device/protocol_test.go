@@ -86,3 +86,61 @@ func TestEncodeKeyLEDConfigReportMatchesFirmwareLayout(t *testing.T) {
 		t.Fatalf("encodeKeyLEDConfigReport() = % X, want % X", got[:], want[:])
 	}
 }
+
+func TestDecodeDesktopBLEInputReport(t *testing.T) {
+	got, ok := decodeDesktopBLEInputReport([]byte{0x2A, 0xFE, 0x01, 0x74, 0x10, 0x01})
+	if !ok {
+		t.Fatal("decodeDesktopBLEInputReport() rejected valid payload")
+	}
+	want := Report{
+		Connected:       true,
+		Keys:            0x2A,
+		EncoderDelta:    -2,
+		EncoderPressed:  true,
+		BatteryMV:       4212,
+		USBPowerPresent: true,
+	}
+	if got != want {
+		t.Fatalf("decodeDesktopBLEInputReport() = %+v, want %+v", got, want)
+	}
+
+	if _, ok := decodeDesktopBLEInputReport([]byte{0x01, 0x02}); ok {
+		t.Fatal("decodeDesktopBLEInputReport() accepted malformed payload")
+	}
+}
+
+func TestDecodeDesktopBLEProtocol(t *testing.T) {
+	if !decodeDesktopBLEProtocol([]byte{desktopBLEProtocolVersion, desktopBLECapabilityLEDConfig}) {
+		t.Fatal("decodeDesktopBLEProtocol() rejected supported protocol")
+	}
+	if decodeDesktopBLEProtocol([]byte{desktopBLEProtocolVersion, 0x00}) {
+		t.Fatal("decodeDesktopBLEProtocol() accepted missing LED config capability")
+	}
+	if decodeDesktopBLEProtocol([]byte{0xFF, desktopBLECapabilityLEDConfig}) {
+		t.Fatal("decodeDesktopBLEProtocol() accepted wrong version")
+	}
+}
+
+func TestEncodeKeyLEDConfigPayloadMatchesBLELayout(t *testing.T) {
+	settings := KeyLEDSettings{
+		{Color: [3]byte{0x11, 0x22, 0x33}, Brightness: 0x40},
+		{Color: [3]byte{0x44, 0x55, 0x66}, Brightness: 0x50},
+		{Color: [3]byte{0x77, 0x88, 0x99}, Brightness: 0x60},
+		{Color: [3]byte{0xAA, 0xBB, 0xCC}, Brightness: 0x70},
+		{Color: [3]byte{0xDD, 0xEE, 0xFF}, Brightness: 0x80},
+		{Color: [3]byte{0x10, 0x20, 0x30}, Brightness: 0x90},
+	}
+	want := [desktopBLEConfigSize]byte{
+		configKindKeyColors,
+		0x11, 0x22, 0x33, 0x40,
+		0x44, 0x55, 0x66, 0x50,
+		0x77, 0x88, 0x99, 0x60,
+		0xAA, 0xBB, 0xCC, 0x70,
+		0xDD, 0xEE, 0xFF, 0x80,
+		0x10, 0x20, 0x30, 0x90,
+	}
+	got := encodeKeyLEDConfigPayload(settings)
+	if got != want {
+		t.Fatalf("encodeKeyLEDConfigPayload() = % X, want % X", got[:], want[:])
+	}
+}

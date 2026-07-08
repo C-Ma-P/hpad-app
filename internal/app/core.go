@@ -59,6 +59,7 @@ type Core struct {
 	persisted      config.Config
 	state          DashboardState
 	prevKeys       uint8
+	activeSource   device.Source
 	started        bool
 	runtimeError   string
 	statusObserver func(RuntimeStatus)
@@ -137,6 +138,7 @@ func (c *Core) Stop() error {
 	c.device = nil
 	c.cancel = nil
 	c.prevKeys = 0
+	c.activeSource = ""
 	c.runtimeError = ""
 	c.state = newDashboardState(c.config)
 	c.state.Dirty = !reflect.DeepEqual(c.config, c.persisted)
@@ -242,38 +244,46 @@ func (c *Core) SaveToDevice() (DashboardState, error) {
 }
 
 func (c *Core) handleConnected(info device.Info) {
-	log.Printf("[core] dongle connected: %s", info.Path)
+	log.Printf("[core] %s connected: %s", info.Source, info.Path)
 	c.mu.Lock()
-	cfg := config.Clone(c.config)
-	manager := c.device
-	c.state.DongleStatus = DeviceConnectionStatus{
-		State:  "connected",
-		Label:  "Connected",
-		Detail: "USB HID interface available",
-		Path:   info.Path,
+	if info.Source == device.SourceBLE {
+		c.state.MacropadStatus = DeviceConnectionStatus{
+			State:  "connected",
+			Label:  "BLE Linked",
+			Detail: "Desktop BLE link is open, waiting for input report",
+			Path:   info.Path,
+		}
+	} else {
+		c.state.DongleStatus = DeviceConnectionStatus{
+			State:  "connected",
+			Label:  "Connected",
+			Detail: "USB receiver HID interface available",
+			Path:   info.Path,
+		}
+		c.state.MacropadStatus = disconnectedMacropadStatus()
 	}
 	c.runtimeError = ""
-	c.state.MacropadStatus = disconnectedMacropadStatus()
 	observer, status := c.runtimeStatusLocked()
 	c.mu.Unlock()
 	notifyRuntimeStatus(observer, status)
-
-	if err := syncKeyLEDConfig(manager, cfg); err != nil {
-		log.Printf("[core] failed to sync LED config: %v", err)
-	}
 }
 
 func (c *Core) handleDisconnected(info device.DisconnectInfo) {
-	log.Printf("[core] dongle disconnected: %s", info.Reason)
+	log.Printf("[core] %s disconnected: %s", info.Source, info.Reason)
 	c.mu.Lock()
-	c.state.DongleStatus = disconnectedDongleStatus(info.Reason)
-	c.state.MacropadStatus = unknownMacropadStatus()
-	c.state.BatteryStatus = waitingBatteryStatus()
-	c.prevKeys = 0
-	if info.IsError {
-		c.runtimeError = info.Reason
+	if info.Source == device.SourceBLE {
+		if info.IsError {
+			c.runtimeError = info.Reason
+		} else {
+			c.runtimeError = ""
+		}
 	} else {
-		c.runtimeError = ""
+		c.state.DongleStatus = disconnectedDongleStatus(info.Reason)
+		if info.IsError {
+			c.runtimeError = info.Reason
+		} else {
+			c.runtimeError = ""
+		}
 	}
 	observer, status := c.runtimeStatusLocked()
 	c.mu.Unlock()
@@ -293,7 +303,8 @@ func (c *Core) handleReport(report device.Report) {
 		c.runtimeError = ""
 		c.state.BatteryStatus = waitingBatteryStatus()
 		c.prevKeys = 0
-		c.state.MacropadStatus = disconnectedMacropadStatus()
+		c.activeSource = ""
+		c.state.MacropadStatus = disconnectedMacropadStatusForSource(report.Source)
 		observer, status := c.runtimeStatusLocked()
 		c.mu.Unlock()
 		notifyRuntimeStatus(observer, status)
@@ -301,17 +312,27 @@ func (c *Core) handleReport(report device.Report) {
 	}
 
 	report.Keys &= 0x3F
+	syncConfig := c.activeSource != report.Source
+	cfg := config.Clone(c.config)
+	manager := c.device
 	previous := c.prevKeys
 	rising := report.Keys &^ previous
 	c.prevKeys = report.Keys
+	c.activeSource = report.Source
 	c.runtimeError = ""
-	c.state.MacropadStatus = connectedMacropadStatus()
+	c.state.MacropadStatus = connectedMacropadStatusForSource(report.Source)
 	c.state.BatteryStatus = batteryStatusFromReport(report)
 	assignments := config.Clone(c.config).KeyAssignments
 	runner := c.runner
 	observer, status := c.runtimeStatusLocked()
 	c.mu.Unlock()
 	notifyRuntimeStatus(observer, status)
+
+	if syncConfig {
+		if err := syncKeyLEDConfig(manager, cfg); err != nil {
+			log.Printf("[core] failed to sync LED config: %v", err)
+		}
+	}
 
 	if runner == nil {
 		return

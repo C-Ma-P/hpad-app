@@ -22,23 +22,39 @@ func unknownMacropadStatus() DeviceConnectionStatus {
 	return DeviceConnectionStatus{
 		State:  "unknown",
 		Label:  "Unknown",
-		Detail: "Waiting for dongle",
+		Detail: "Waiting for a Desktop Dongle or Desktop BLE report",
 	}
 }
 
 func disconnectedMacropadStatus() DeviceConnectionStatus {
+	return disconnectedMacropadStatusForSource(device.SourceUSB)
+}
+
+func disconnectedMacropadStatusForSource(source device.Source) DeviceConnectionStatus {
+	detail := "USB receiver is online, waiting for the wireless macropad"
+	if source == device.SourceBLE {
+		detail = "Desktop BLE link is disconnected"
+	}
 	return DeviceConnectionStatus{
 		State:  "disconnected",
 		Label:  "Disconnected",
-		Detail: "Dongle is online, waiting for the wireless macropad",
+		Detail: detail,
 	}
 }
 
 func connectedMacropadStatus() DeviceConnectionStatus {
+	return connectedMacropadStatusForSource(device.SourceUSB)
+}
+
+func connectedMacropadStatusForSource(source device.Source) DeviceConnectionStatus {
+	detail := "Wireless macropad is reporting through Desktop Dongle"
+	if source == device.SourceBLE {
+		detail = "Wireless macropad is reporting through Desktop BLE"
+	}
 	return DeviceConnectionStatus{
 		State:  "connected",
 		Label:  "Connected",
-		Detail: "Wireless macropad is reporting through the dongle",
+		Detail: detail,
 	}
 }
 

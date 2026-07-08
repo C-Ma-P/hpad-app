@@ -18,13 +18,21 @@ type Manager struct {
 	running                bool
 	cancel                 context.CancelFunc
 	done                   chan struct{}
-	device                 *hid.Device
+	usbDevice              *hid.Device
+	bleClient              desktopBLETransport
+	activeSource           Source
 	initOnce               sync.Once
 	initErr                error
 	lastScan               string
 	lastOpen               string
-	lastDisconnectReason   string
-	lastDisconnectWasError bool
+	lastDisconnectReason   map[Source]string
+	lastDisconnectWasError map[Source]bool
+}
+
+type desktopBLETransport interface {
+	Start(context.Context) error
+	Stop()
+	SyncKeyLEDSettings(KeyLEDSettings) error
 }
 
 // lastScanSentinel is an initial value for Manager.lastScan that can never
@@ -44,7 +52,14 @@ func NewManager(callbacks Callbacks) *Manager {
 	if callbacks.Log == nil {
 		callbacks.Log = func(string, string) {}
 	}
-	return &Manager{callbacks: callbacks, lastScan: lastScanSentinel}
+	manager := &Manager{
+		callbacks:              callbacks,
+		lastScan:               lastScanSentinel,
+		lastDisconnectReason:   map[Source]string{},
+		lastDisconnectWasError: map[Source]bool{},
+	}
+	manager.bleClient = newDesktopBLEClient(callbacks, manager.emitReport)
+	return manager
 }
 
 func (m *Manager) Start(parent context.Context) error {
@@ -54,10 +69,27 @@ func (m *Manager) Start(parent context.Context) error {
 		return nil
 	}
 	ctx, cancel := context.WithCancel(parent)
+	var wg sync.WaitGroup
+
 	m.running = true
 	m.cancel = cancel
 	m.done = make(chan struct{})
-	go m.loop(ctx)
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		m.usbLoop(ctx)
+	}()
+	go func() {
+		defer wg.Done()
+		m.bleLoop(ctx)
+	}()
+	go func() {
+		wg.Wait()
+		m.mu.Lock()
+		m.running = false
+		close(m.done)
+		m.mu.Unlock()
+	}()
 	return nil
 }
 
@@ -74,22 +106,18 @@ func (m *Manager) Stop() {
 	if cancel != nil {
 		cancel()
 	}
+	if m.bleClient != nil {
+		m.bleClient.Stop()
+	}
 	if done != nil {
 		<-done
 	}
 }
 
-func (m *Manager) loop(ctx context.Context) {
-	defer func() {
-		m.mu.Lock()
-		m.running = false
-		close(m.done)
-		m.mu.Unlock()
-	}()
-
+func (m *Manager) usbLoop(ctx context.Context) {
 	if err := m.init(); err != nil {
 		log.Printf("[device] hid.Init failed: %v", err)
-		m.callbacks.Disconnected(DisconnectInfo{Reason: err.Error(), IsError: true})
+		m.sourceDisconnected(DisconnectInfo{Source: SourceUSB, Reason: err.Error(), IsError: true})
 		return
 	}
 	m.callbacks.Log("info", "HID manager initialized")
@@ -105,7 +133,7 @@ func (m *Manager) loop(ctx context.Context) {
 		candidates, err := enumerate()
 		if err != nil {
 			m.callbacks.Log("error", fmt.Sprintf("HID enumerate failed: %v", err))
-			m.notifyDisconnected(DisconnectInfo{Reason: err.Error(), IsError: true})
+			m.sourceDisconnected(DisconnectInfo{Source: SourceUSB, Reason: err.Error(), IsError: true})
 			if !waitRetry(ctx) {
 				return
 			}
@@ -119,7 +147,7 @@ func (m *Manager) loop(ctx context.Context) {
 			if sysfsMatch {
 				reason = "device visible in sysfs but not enumerable by hidapi (permission denied on hidraw - run: task linux:install-udev-rule, then replug)"
 			}
-			m.notifyDisconnected(DisconnectInfo{Reason: reason})
+			m.sourceDisconnected(DisconnectInfo{Source: SourceUSB, Reason: reason})
 			if !waitRetry(ctx) {
 				return
 			}
@@ -132,20 +160,21 @@ func (m *Manager) loop(ctx context.Context) {
 				m.callbacks.Log("error", fmt.Sprintf("Failed to open HPad HID interface(s): %s", err.Error()))
 				m.lastOpen = err.Error()
 			}
-			m.notifyDisconnected(DisconnectInfo{Reason: err.Error(), IsError: true})
+			m.sourceDisconnected(DisconnectInfo{Source: SourceUSB, Reason: err.Error(), IsError: true})
 			if !waitRetry(ctx) {
 				return
 			}
 			continue
 		}
 		m.lastOpen = ""
-		m.lastDisconnectReason = ""
-		m.setDevice(dev)
+		m.lastDisconnectReason[SourceUSB] = ""
+		info.Source = SourceUSB
+		m.setUSBDevice(dev)
 
 		m.callbacks.Log("info", fmt.Sprintf("Opened HPad HID interface %s (usage 0x%04X/0x%04X, iface %d)", info.Path, info.UsagePage, info.Usage, info.InterfaceNumber))
 		m.callbacks.Connected(info)
 		readErr := m.readLoop(ctx, dev)
-		m.setDevice(nil)
+		m.setUSBDevice(nil)
 		_ = dev.Close()
 
 		if ctx.Err() != nil {
@@ -155,10 +184,19 @@ func (m *Manager) loop(ctx context.Context) {
 			readErr = errors.New("device disconnected")
 		}
 		m.callbacks.Log("warn", fmt.Sprintf("HPad HID interface closed: %s", readErr.Error()))
-		m.notifyDisconnected(DisconnectInfo{Reason: readErr.Error()})
+		m.sourceDisconnected(DisconnectInfo{Source: SourceUSB, Reason: readErr.Error()})
 		if !waitRetry(ctx) {
 			return
 		}
+	}
+}
+
+func (m *Manager) bleLoop(ctx context.Context) {
+	if m.bleClient == nil {
+		return
+	}
+	if err := m.bleClient.Start(ctx); err != nil && ctx.Err() == nil {
+		m.sourceDisconnected(DisconnectInfo{Source: SourceBLE, Reason: err.Error(), IsError: true})
 	}
 }
 
@@ -176,11 +214,15 @@ func (m *Manager) logScan(candidates []Info) {
 }
 
 func (m *Manager) notifyDisconnected(info DisconnectInfo) {
-	if info.Reason == m.lastDisconnectReason && info.IsError == m.lastDisconnectWasError {
+	if info.Source == "" {
+		info.Source = SourceUSB
+	}
+	if info.Reason == m.lastDisconnectReason[info.Source] &&
+		info.IsError == m.lastDisconnectWasError[info.Source] {
 		return
 	}
-	m.lastDisconnectReason = info.Reason
-	m.lastDisconnectWasError = info.IsError
+	m.lastDisconnectReason[info.Source] = info.Reason
+	m.lastDisconnectWasError[info.Source] = info.IsError
 	m.callbacks.Disconnected(info)
 }
 
@@ -192,18 +234,33 @@ func (m *Manager) init() error {
 }
 
 func (m *Manager) SyncKeyLEDSettings(settings KeyLEDSettings) error {
-	report := encodeKeyLEDConfigReport(settings)
-
 	m.mu.Lock()
-	dev := m.device
+	source := m.activeSource
+	dev := m.usbDevice
+	bleClient := m.bleClient
 	m.mu.Unlock()
-	if dev == nil {
-		return errors.New("dongle not connected")
-	}
 
 	m.writeMu.Lock()
 	defer m.writeMu.Unlock()
 
+	switch source {
+	case SourceUSB:
+		if dev == nil {
+			return errors.New("USB dongle is not connected")
+		}
+		return syncUSBKeyLEDSettings(dev, settings)
+	case SourceBLE:
+		if bleClient == nil {
+			return errors.New("Desktop BLE transport is unavailable")
+		}
+		return bleClient.SyncKeyLEDSettings(settings)
+	default:
+		return errors.New("no active macropad transport")
+	}
+}
+
+func syncUSBKeyLEDSettings(dev *hid.Device, settings KeyLEDSettings) error {
+	report := encodeKeyLEDConfigReport(settings)
 	n, err := dev.SendOutputReport(report[:])
 	if err != nil {
 		return err
@@ -215,10 +272,64 @@ func (m *Manager) SyncKeyLEDSettings(settings KeyLEDSettings) error {
 	return nil
 }
 
-func (m *Manager) setDevice(dev *hid.Device) {
+func (m *Manager) setUSBDevice(dev *hid.Device) {
 	m.mu.Lock()
-	m.device = dev
+	m.usbDevice = dev
 	m.mu.Unlock()
+}
+
+func (m *Manager) emitReport(source Source, report Report) {
+	report.Source = source
+	if !m.claimSource(source, report.Connected) {
+		m.callbacks.Log("debug", fmt.Sprintf("Ignoring %s report while %s is active", source, m.currentActiveSource()))
+		return
+	}
+	m.callbacks.Report(report)
+}
+
+func (m *Manager) claimSource(source Source, connected bool) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if !connected {
+		if m.activeSource == source {
+			m.activeSource = ""
+			m.callbacks.Log("info", fmt.Sprintf("Released active HPAD source %s", source))
+			return true
+		}
+		return false
+	}
+	if m.activeSource == "" {
+		m.activeSource = source
+		m.callbacks.Log("info", fmt.Sprintf("Latched active HPAD source %s", source))
+		return true
+	}
+
+	return m.activeSource == source
+}
+
+func (m *Manager) sourceDisconnected(info DisconnectInfo) {
+	if info.Source == "" {
+		info.Source = SourceUSB
+	}
+	m.mu.Lock()
+	wasActive := m.activeSource == info.Source
+	if wasActive {
+		m.activeSource = ""
+	}
+	m.mu.Unlock()
+
+	if wasActive {
+		m.callbacks.Log("info", fmt.Sprintf("Released active HPAD source %s after disconnect", info.Source))
+		m.callbacks.Report(Report{Source: info.Source, Connected: false})
+	}
+	m.notifyDisconnected(info)
+}
+
+func (m *Manager) currentActiveSource() Source {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.activeSource
 }
 
 func (m *Manager) readLoop(ctx context.Context, dev *hid.Device) error {
@@ -248,7 +359,7 @@ func (m *Manager) readLoop(ctx context.Context, dev *hid.Device) error {
 		if !ok {
 			continue
 		}
-		m.callbacks.Report(report)
+		m.emitReport(SourceUSB, report)
 	}
 }
 
